@@ -1,6 +1,6 @@
 **Assignment 0 Report**
 
-AndrewID: XXXX
+AndrewID: junrenj
 
 (##) About this template
 
@@ -14,36 +14,36 @@ AndrewID: XXXX
 
 Step 1: Clone
 <div class="twentytwenty-container">
-    <img src="A0-writeup/reference/step1-github-ref-1.png" alt="Github-CLI">
+    <img src="A0-writeup/reference/step1-github-local.png" alt="Github-CLI">
 </div>
 or
 <div class="twentytwenty-container">
-    <img src="A0-writeup/reference/step1-github-ref-2.png" alt="Github-Web">
+    <img src="A0-writeup/reference/step1-github_cloud.png" alt="Github-Web">
 </div>
 
 Step 2: General Setup
 
 Visual Studio:
 <div class="twentytwenty-container">
-    <img src="A0-writeup/reference/step2-vs-ref.png" alt="Visual Studio">
+    <img src="A0-writeup/reference/step2-vs.png" alt="Visual Studio">
 </div>
 
 Node:
 <div class="twentytwenty-container">
-    <img src="A0-writeup/reference/step2-node-ref.png" alt="Node">
+    <img src="A0-writeup/reference/step2-node.png" alt="Node">
 </div>
 
 Nest-libs:
 <div class="twentytwenty-container">
-    <img src="A0-writeup/reference/step2-nest-libs-ref.png" alt="Nest-libs">
+    <img src="A0-writeup/reference/step2-nest-libs.png" alt="Nest-libs">
 </div>
 
 Step 3: Build and Run
 <div class="twentytwenty-container">
-    <img src="A0-writeup/reference/step3-GUI-ref.png" alt="GUI">
+    <img src="A0-writeup/reference/step3-GUI.png" alt="GUI">
 </div>
 <div class="twentytwenty-container">
-    <img src="A0-writeup/reference/step3-tests-ref.png" alt="Run-tests">
+    <img src="A0-writeup/reference/step3-tests.png" alt="Run-tests">
 </div>
 
 (##) A0T2
@@ -53,13 +53,15 @@ Your completion of this task will be graded based on your `test.a0.task2.problem
 For each of the problems you solved in task 2, characterise the bug in your own words and explain one other scenario that may cause this 
 type of bug.
 
-Problem 1:
+Problem 1: The correct spelling is not "cour" but should be "cout." 
+        2.When using cout<<, you cannot use "+" for string concatenation.
+        3.The printf line of code is missing a semicolon at the end.
 
-Problem 2:
+Problem 2: C++ will convert type of values during the calculation. Both y and factor are int. Their quotient will be int, causing the decimal part of the result to be discarded, which leads to an inaccurate final result.
 
-Problem 3:
+Problem 3: In C++, std::vector::end() does not point to the last element of the vector, but rather to the memory unit just after the last element. This unit does not store any data. Also it exceeded the range. So if we try to use * to get the value inside it, it would cause an error.Therefore, to access the last element of a std::vector, we should use vector.end() - 1.
 
-Problem 4:
+Problem 4: The == operator returns a boolean value, and in C++, a boolean value is represented as 0 (false) or 1 (true). So vec1.at(i) == vec2.at(j)) == vec3.at(k) means valueA(bool) ==valueB(int). At this point, C++ will automatically convert the bool value to an int value, which means the whole code is to compare the value of vec3.at(k) with 1 or 0. So count only would be added when vec3.at(k) equals 0, which also means it’s the condition when vec1.at(i) unequals vec2.at(j)).
 
 
 (##) A0T3
