@@ -352,7 +352,8 @@ template<PrimitiveType p, class P, uint32_t flags>
 void Pipeline<p, P, flags>::rasterize_line(
 	ClippedVertex const& va, ClippedVertex const& vb,
 	std::function<void(Fragment const&)> const& emit_fragment) {
-	if constexpr ((flags & PipelineMask_Interp) != Pipeline_Interp_Flat) {
+	if constexpr ((flags & PipelineMask_Interp) != Pipeline_Interp_Flat) 
+	{
 		assert(0 && "rasterize_line should only be invoked in flat interpolation mode.");
 	}
 	// A1T2: rasterize_line
@@ -360,16 +361,95 @@ void Pipeline<p, P, flags>::rasterize_line(
 	// TODO: Check out the block comment above this function for more information on how to fill in
 	// this function!
 	// The OpenGL specification section 3.5 may also come in handy.
+	
+	// get screen pos
+	Vec3 v0 = va.fb_position;
+	Vec3 v1 = vb.fb_position;
 
-	{ // As a placeholder, draw a point in the middle of the line:
-		//(remove this code once you have a real implementation)
-		Fragment mid;
-		mid.fb_position = (va.fb_position + vb.fb_position) / 2.0f;
-		mid.attributes = va.attributes;
-		mid.derivatives.fill(Vec2(0.0f, 0.0f));
-		emit_fragment(mid);
+	int x0 = static_cast<int>(v0.x);
+	int x1 = static_cast<int>(v1.x);
+	int y0 = static_cast<int>(v0.y);
+	int y1 = static_cast<int>(v1.y);
+	float z0 = v0.z;
+	float z1 = v1.z;
+	
+	int dx = x1 - x0;
+	int dy = y1 - y0;
+	float dz = z1 - z0;
+
+	int stepX = 1;
+	int stepY = 1;
+
+
+	// ensure x1 > x0
+	if(x1 < x0)
+	{
+		std::swap(v0,v1);
+		std::swap(x0,x1);
+		std::swap(y0,y1);
+		std::swap(z0,z1);
+		dx = x1 - x0;
+	    dy = y1 - y0;
+		dz = z1 - z0;
 	}
 
+	if(y1 < y0)
+	{
+		stepY = -stepY;
+		dy = abs(dy);
+	}
+	
+	int errX = 2 * dy - dx;
+	int errY = 2 * dx - dy;
+
+	int slope = dy / dx;
+	int slopeInverse = dx / dy;
+
+	dz = dz / std::max(dx, dy);
+
+	while(true)
+	{
+		float centerX = x0 + 0.5f;
+		float centerY = y0 + 0.5f;
+		float lineY = v0.y + slope *(centerX - x0);
+		float lineX = v0.x + slopeInverse *(centerY - y0);
+
+		if(lineY - centerY != 0.5f || lineX - centerX != 0.5f)
+		{
+
+		}
+
+
+		Fragment frag;
+		frag.fb_position = Vec3(centerX, centerY, z0);
+		frag.derivatives.fill(Vec2(0.0f, 0.0f));
+		frag.attributes = va.attributes;
+		emit_fragment(frag);
+
+		if(x0 == x1 && y0 == y1) 
+			break;
+
+		// X is main
+		if(errX < 0)
+			errX += 2 * dy;
+		else
+		{
+			// change (y++)
+			errX += 2*(dy -dx);
+			y0 += stepY;
+		}
+
+		// Y is main
+		if(errY < 0)
+			errY += 2*dx;
+		else
+		{
+			// change x++
+			errY += 2*(dx - dy);
+			x0 += stepX;
+		}
+		z0 += dz;
+	}
 }
 
 /*
@@ -417,30 +497,88 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 	//  same code paths. Be aware, however, that all of them need to remain working!
 	//  (e.g., if you break Flat while implementing Correct, you won't get points
 	//   for Flat.)
-	if constexpr ((flags & PipelineMask_Interp) == Pipeline_Interp_Flat) {
-		// A1T3: flat triangles
-		// TODO: rasterize triangle (see block comment above this function).
+	
+	// Boundbox
+	int minX = static_cast<int>(std::floor(std::min({va.fb_position.x, vb.fb_position.x, vc.fb_position.x})));
+	int minY = static_cast<int>(std::floor(std::min({va.fb_position.y, vb.fb_position.y, vc.fb_position.y})));
+	int maxX = static_cast<int>(std::ceil(std::max({va.fb_position.x, vb.fb_position.x, vc.fb_position.x})));
+	int maxY = static_cast<int>(std::ceil(std::max({va.fb_position.y, vb.fb_position.y, vc.fb_position.y})));
 
-		// As a placeholder, here's code that draws some lines:
-		//(remove this and replace it with a real solution)
-		Pipeline<PrimitiveType::Lines, P, flags>::rasterize_line(va, vb, emit_fragment);
-		Pipeline<PrimitiveType::Lines, P, flags>::rasterize_line(vb, vc, emit_fragment);
-		Pipeline<PrimitiveType::Lines, P, flags>::rasterize_line(vc, va, emit_fragment);
-	} else if constexpr ((flags & PipelineMask_Interp) == Pipeline_Interp_Smooth) {
-		// A1T5: screen-space smooth triangles
-		// TODO: rasterize triangle (see block comment above this function).
+	// ab * ap
+	auto EdgeFunction = [](Vec2 a, Vec2 b, Vec2 p)
+	{
+		return (b.x - a.x)*(p.y - a.y) - (b.y - a.y)*(p.x -a.x);
+	};
 
-		// As a placeholder, here's code that calls the Flat interpolation version of the function:
-		//(remove this and replace it with a real solution)
-		Pipeline<PrimitiveType::Lines, P, (flags & ~PipelineMask_Interp) | Pipeline_Interp_Flat>::rasterize_triangle(va, vb, vc, emit_fragment);
-	} else if constexpr ((flags & PipelineMask_Interp) == Pipeline_Interp_Correct) {
-		// A1T5: perspective correct triangles
-		// TODO: rasterize triangle (block comment above this function).
 
-		// As a placeholder, here's code that calls the Screen-space interpolation function:
-		//(remove this and replace it with a real solution)
-		Pipeline<PrimitiveType::Lines, P, (flags & ~PipelineMask_Interp) | Pipeline_Interp_Smooth>::rasterize_triangle(va, vb, vc, emit_fragment);
+	Vec2 a = Vec2(va.fb_position.x, va.fb_position.y);
+	Vec2 b = Vec2(vb.fb_position.x, vb.fb_position.y);
+	Vec2 c = Vec2(vc.fb_position.x, vc.fb_position.y);
+
+	float area = EdgeFunction(a, b, c);
+
+	// just lines
+	if(area == 0)
+		return;
+
+	for (int y = minY; y < maxY; y++)
+	{
+		for (int x = minX; x < maxX; x++)
+		{
+			Vec2 target = Vec2(x + 0.5f, y + 0.5f);
+			float w0 = EdgeFunction(b, c, target);
+			float w1 = EdgeFunction(c, a, target);
+			float w2 = EdgeFunction(a, b, target);
+
+			if(w0 >= 0 && w1 >= 0 && w2 >= 0)
+			{
+				w0 /= area;
+				w1 /= area;
+				w2 /= area;
+
+				Fragment frag;
+				frag.fb_position = Vec3(target.x, target.y, w0 * va.fb_position.z + w1 * vb.fb_position.z + w2 * vc.fb_position.z);
+				
+				if constexpr ((flags & PipelineMask_Interp) == Pipeline_Interp_Flat) 
+				{
+					frag.attributes = va.attributes;
+				}
+				else if constexpr ((flags & PipelineMask_Interp) == Pipeline_Interp_Smooth) 
+				{
+					// A1T5: screen-space smooth triangles
+					for (int i = 0; i < va.attributes.size(); i++)
+					{
+						frag.attributes[i] = w0 * va.attributes[i] + w1 * vb.attributes[i] + w2 * vc.attributes[i];
+					}
+					
+				} else if constexpr ((flags & PipelineMask_Interp) == Pipeline_Interp_Correct) 
+				{
+					float epsilon = 1e-6f;
+					// 1/ZP = w0/ZA + w1/ZB + w2/ZC
+					float pzInverse = w0 / va.fb_position.z + w1 / vb.fb_position.z + w2 / vc.fb_position.z;
+					pzInverse = fabs(pzInverse) < epsilon ? epsilon : pzInverse;
+					float pz = 1 / pzInverse;
+					for (int i = 0; i < va.attributes.size(); i++)
+					{
+						double attribute = (w0 * va.attributes[i] / va.fb_position.z 
+												 + w1 * vb.attributes[i] / vb.fb_position.z
+												 + w2 * vc.attributes[i] / vc.fb_position.z);
+						frag.attributes[i] = static_cast<float>(pz * attribute);
+					}
+				}
+				emit_fragment(frag);
+			}
+
+		}
+		
 	}
+	
+
+
+
+
+	 
+	
 }
 
 //-------------------------------------------------------------------------
