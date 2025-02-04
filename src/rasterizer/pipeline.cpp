@@ -368,7 +368,6 @@ void Pipeline<p, P, flags>::rasterize_line(
 	// get screen pos
 	Vec3 v0 = va.fb_position;
 	Vec3 v1 = vb.fb_position;
-
 	int x0 = static_cast<int>(v0.x);
 	int x1 = static_cast<int>(v1.x);
 	int y0 = static_cast<int>(v0.y);
@@ -382,7 +381,6 @@ void Pipeline<p, P, flags>::rasterize_line(
 
 	int stepX = 1;
 	int stepY = 1;
-
 
 	// ensure x1 > x0
 	if(x1 < x0)
@@ -401,36 +399,109 @@ void Pipeline<p, P, flags>::rasterize_line(
 		stepY = -stepY;
 		dy = abs(dy);
 	}
+
+	float slope = (float)dy / dx;
 	
 	int errX = 2 * dy - dx;
 	int errY = 2 * dx - dy;
 
-	int slope = dy / dx;
-	int slopeInverse = dx / dy;
-
 	dz = dz / std::max(dx, dy);
+
+	int x = x0;
+	int y = y0;
+	auto DiamondExit = [](int x, int y, float x1, float y1, float k) -> bool 
+	{
+		float solution;
+		int count = 0;
+		float b;
+		if(std::isinf(k))	// in case k = inf
+		{
+			b = x1 - x;
+			if(b <= 0.5f)
+			{
+				solution = b + 0.5f;
+				if( solution >= 0.5f && solution <= y1 && solution < 1.0f)
+					count ++;
+				solution = 0.5f - b;
+				if( solution >= 0 && solution <= y1 && solution < 0.5f)
+					count ++;
+			}
+			else
+			{
+				solution = b - 0.5f;
+				if( solution > 0 && solution <= y1  && solution < 0.5f)
+					count ++;
+				solution = 1.5f - b;
+				if( solution > 0.5f && solution <= y1 && solution < 1.0f)
+					count ++;
+			}
+		}
+		else
+		{
+			b = k * (y1 - y) / (x1 - x);
+		// true shaded false not shaded
+		// if intersection point >= 2 the line must pass through whole diamond
+		// y = x + 0.5f and y = x - 0.5f
+		if(k != 1)
+		{
+			// y = x + 0.5f
+			solution = (0.5f - b) / (k - 1);
+			if(solution >= 0 && solution < 0.5f && solution <=(x1 - x))
+				count++;
+			// y = x - 0.5f
+			solution = (-0.5f - b) / (k - 1);
+			if(solution >= 0.5f && solution < 1 && solution <= (x1 - x))
+				count++;
+		}
+		else
+		{
+			if(b == 0.5f && x1 == x + 0.5f)
+				return true;
+			else if(b == -0.5f && x1 == x + 1.0f)
+				return true;
+		}
+
+		// y = -x + 1.5f and y = -x + 0.5f
+		if(k != -1)
+		{
+			// y = -x + 1.5f
+			solution = (1.5f - b) / (k + 1);
+			if(solution > 0.5f && solution < 1.0f && solution <=(x1 - x))
+				count++;
+			// y = -x + 0.5f
+			solution = (0.5f - b) / (k + 1);
+			if(solution >= 0 && solution <= 0.5f && solution <= (x1 - x))
+				count++;
+		}
+		else
+		{
+			if(b == 1.5f)
+				return false;
+			else if(b == 0.5f && y1 - y < 0)
+				return true;
+		}
+		}
+		return count >=2;
+	};
 
 	while(true)
 	{
-		float centerX = x0 + 0.5f;
-		float centerY = y0 + 0.5f;
-		float lineY = v0.y + slope *(centerX - x0);
-		float lineX = v0.x + slopeInverse *(centerY - y0);
-
-		if(lineY - centerY != 0.5f || lineX - centerX != 0.5f)
-		{
-
-		}
-
+		float centerX = x + 0.5f;
+		float centerY = y + 0.5f;
 
 		Fragment frag;
 		frag.fb_position = Vec3(centerX, centerY, z0);
 		frag.derivatives.fill(Vec2(0.0f, 0.0f));
 		frag.attributes = va.attributes;
-		emit_fragment(frag);
 
-		if(x0 == x1 && y0 == y1) 
-			break;
+		if(x == x1 && y == y1)	// end Point Check
+		{
+			if(DiamondExit(x, y, v1.x, v1.y, slope))
+				emit_fragment(frag);
+				break;
+		}
+		else
+			emit_fragment(frag);
 
 		// X is main
 		if(errX < 0)
@@ -439,7 +510,7 @@ void Pipeline<p, P, flags>::rasterize_line(
 		{
 			// change (y++)
 			errX += 2*(dy -dx);
-			y0 += stepY;
+			y += stepY;
 		}
 
 		// Y is main
@@ -449,7 +520,7 @@ void Pipeline<p, P, flags>::rasterize_line(
 		{
 			// change x++
 			errY += 2*(dx - dy);
-			x0 += stepX;
+			x += stepX;
 		}
 		z0 += dz;
 	}
@@ -524,16 +595,16 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 	if(area == 0)
 		return;
 
-	for (int y = minY; y < maxY; y++)
+	for (int y = minY; y <= maxY; y++)
 	{
-		for (int x = minX; x < maxX; x++)
+		for (int x = minX; x <= maxX; x++)
 		{
 			Vec2 target = Vec2(x + 0.5f, y + 0.5f);
 			float w0 = EdgeFunction(b, c, target);
 			float w1 = EdgeFunction(c, a, target);
 			float w2 = EdgeFunction(a, b, target);
 
-			if(w0 >= 0 && w1 >= 0 && w2 >= 0)
+			if(w0 >= 0 && w1 >= 0 && w2 >= 0 || w0 <= 0 && w1 <= 0 && w2 <= 0)
 			{
 				w0 /= area;
 				w1 /= area;
