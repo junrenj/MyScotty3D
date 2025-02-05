@@ -172,7 +172,7 @@ void Pipeline<primitive_type, Program, flags>::run(std::vector<Vertex> const& ve
 				// A1T4: Blend_Over
 				// TODO: set framebuffer color to the result of "over" blending (also called "alpha blending") the fragment color over the framebuffer color, using the fragment's opacity
 				// 		 You may assume that the framebuffer color has its alpha premultiplied already, and you just want to compute the resulting composite color
-				fb_color = fb_color * (1.0f - sf.opacity) + sf.color * sf.opacity; 
+				fb_color = fb_color + sf.color * sf.opacity; 
 			} else {
 				static_assert((flags & PipelineMask_Blend) <= Pipeline_Blend_Over, "Unknown blending flag.");
 			}
@@ -595,53 +595,95 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 	if(area == 0)
 		return;
 
-	for (int y = minY; y <= maxY; y++)
+	for (int y = minY; y <= maxY; y+=2)
 	{
-		for (int x = minX; x <= maxX; x++)
+		for (int x = minX; x <= maxX; x+=2)
 		{
-			Vec2 target = Vec2(x + 0.5f, y + 0.5f);
-			float w0 = EdgeFunction(b, c, target);
-			float w1 = EdgeFunction(c, a, target);
-			float w2 = EdgeFunction(a, b, target);
+			// 2x2 block for d
+			Fragment frags[2][2];
+			bool validates [2][2] = {false, false, false, false};
 
-			if(w0 >= 0 && w1 >= 0 && w2 >= 0 || w0 <= 0 && w1 <= 0 && w2 <= 0)
+			for (int dy = 0; dy < 2; dy++)
 			{
-				w0 /= area;
-				w1 /= area;
-				w2 /= area;
+				for (int dx = 0; dx < 2; dx++)
+				{
+					Vec2 target = Vec2(x + dx + 0.5f, y + dy + 0.5f);
+					float alpha = EdgeFunction(b, c, target);
+					float beta = EdgeFunction(c, a, target);
+					float gamma = EdgeFunction(a, b, target);
 
-				Fragment frag;
-				frag.fb_position = Vec3(target.x, target.y, w0 * va.fb_position.z + w1 * vb.fb_position.z + w2 * vc.fb_position.z);
-				
-				if constexpr ((flags & PipelineMask_Interp) == Pipeline_Interp_Flat) 
-				{
-					frag.attributes = va.attributes;
-				}
-				else if constexpr ((flags & PipelineMask_Interp) == Pipeline_Interp_Smooth) 
-				{
-					// A1T5: screen-space smooth triangles
-					for (int i = 0; i < va.attributes.size(); i++)
+					if(alpha >= 0 && beta >= 0 && gamma >= 0 || alpha <= 0 && beta <= 0 && gamma <= 0)
 					{
-						frag.attributes[i] = w0 * va.attributes[i] + w1 * vb.attributes[i] + w2 * vc.attributes[i];
-					}
-					
-				} else if constexpr ((flags & PipelineMask_Interp) == Pipeline_Interp_Correct) 
-				{
-					float epsilon = 1e-6f;
-					// 1/ZP = w0/ZA + w1/ZB + w2/ZC
-					float pzInverse = w0 / va.fb_position.z + w1 / vb.fb_position.z + w2 / vc.fb_position.z;
-					pzInverse = fabs(pzInverse) < epsilon ? epsilon : pzInverse;
-					float pz = 1 / pzInverse;
-					for (int i = 0; i < va.attributes.size(); i++)
-					{
-						double attribute = (w0 * va.attributes[i] / va.fb_position.z 
-												 + w1 * vb.attributes[i] / vb.fb_position.z
-												 + w2 * vc.attributes[i] / vc.fb_position.z);
-						frag.attributes[i] = static_cast<float>(pz * attribute);
+						alpha /= area;
+						beta /= area;
+						gamma = 1 - alpha - beta;
+
+						frags[dx][dy].fb_position = Vec3(target.x, target.y, alpha * va.fb_position.z + beta * vb.fb_position.z + gamma * vc.fb_position.z);
+						
+						if constexpr ((flags & PipelineMask_Interp) == Pipeline_Interp_Flat) 
+						{
+							frags[dx][dy].attributes = va.attributes;
+						}
+						else if constexpr ((flags & PipelineMask_Interp) == Pipeline_Interp_Smooth) 
+						{
+							// A1T5: screen-space smooth triangles
+							for (int i = 0; i < va.attributes.size(); i++)
+							{
+								frags[dx][dy].attributes[i] = alpha * va.attributes[i] + beta * vb.attributes[i] + gamma * vc.attributes[i];
+							}
+							
+						} else if constexpr ((flags & PipelineMask_Interp) == Pipeline_Interp_Correct) 
+						{
+							// 1/wp = alpha/wa + beta/wb + gamma/wc
+							float wpInverse = alpha * va.inv_w + beta * vb.inv_w + gamma * vc.inv_w;
+							float wp = 1 / wpInverse;
+							for (int i = 0; i < va.attributes.size(); i++)
+							{
+								float attribute = alpha * va.attributes[i] * va.inv_w 
+														+ beta * vb.attributes[i] * vb.inv_w
+														+ gamma * vc.attributes[i] * vc.inv_w;
+								frags[dx][dy].attributes[i] = static_cast<float>(wp * attribute);
+							}
+						}
+						validates[dx][dy] = true;
+						emit_fragment(frags[dx][dy]);
 					}
 				}
-				emit_fragment(frag);
 			}
+			
+			// Caculate Derivative Based one 2x2 blocks
+			for (int dy = 0; dy < 2; dy++)
+			{
+				for (int dx = 0; dx < 2; dx++)
+				{
+					
+					if(!validates[dx][dy])
+						continue;
+
+					Fragment& fragTarget = frags[dx][dy];
+					for (int i = 0; i < fragTarget.derivatives.size(); i++)
+					{
+						int ix = dx == 0 ? 1 : 0;
+						int iy = dy == 0 ? 1 : 0;
+						float dfx = 0;
+						float dfy = 0; 
+
+						if(validates[ix][dy])
+							dfx = dx == 0 ? frags[ix][dy].attributes[i] - fragTarget.attributes[i] : 
+											fragTarget.attributes[i] - frags[ix][dy].attributes[i];
+						if(validates[dx][iy])
+							dfy = dy == 0 ? frags[dx][iy].attributes[i] - fragTarget.attributes[i] : 
+											fragTarget.attributes[i] - frags[dx][iy].attributes[i];
+
+						fragTarget.derivatives[i] = Vec2(dfx, dfy);
+					}
+				}
+				
+			}
+			
+			
+
+			
 		}
 	}
 }
