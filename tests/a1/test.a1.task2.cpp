@@ -185,4 +185,54 @@ Test test_a1_task2_simple_vertical("a1.task2.simple.vertical", []() {
 	);
 });
 
+Test test_a1_task2_45deg_left_to_top_1diamond("a1.task2.45deg.lefttop.1diamond", []() {
+	check_line_covers("45 degree line from (0, 0.5) to (0.5, 1)",
+		{ Vec2(0.0f, 0.5f), Vec2(0.5f, 1.0f) },
+		{ "...",
+		"#.." }
+		);
+	});
+Test test_a1_task2_45deg_top_to_left_1diamond("a1.task2.45deg.topleft.1diamond", []() {
+	check_line_covers("45 degree line from (0.5, 1) to (0, 0.5)",
+		{ Vec2(0.5f, 1.0f), Vec2(0.0f, 0.5f) },
+		{ "#..",
+		"..." }
+		);
+	});
+Test test_a1_task2_45deg_left_to_bottom_1diamond("a1.task2.45deg.leftbottom.1diamond", []() {
+	check_line_covers("45 degree line from (0, 0.5) to (0.5, 0)",
+		{ Vec2(0.0f, 0.5f), Vec2(0.5f, 0.0f) },
+		{ "...",
+		"..." }
+		);
+	});
+Test test_a1_task2_45deg_bottom_to_left_1diamond("a1.task2.45deg.bottomleft.1diamond", []() {
+	check_line_covers("45 degree line from (0, 0.5) to (0.5, 0)",
+		{ Vec2(0.5f, 0.0f), Vec2(0.0f, 0.5f) },
+		{ "...",
+		"..." }
+		);
+	});
+Test test_a1_task2_45deg_bottom_to_right_1diamond("a1.task2.45deg.bottomright.1diamond", []() {
+	check_line_covers("45 degree line from (0.5, 0) to (1, 0.5)",
+		{ Vec2(0.5f, 0.0f), Vec2(1.0f, 0.5f) },
+		{ "...",
+		"#.." }
+		);
+	});
+Test test_a1_task2_45deg_right_to_bottom_1diamond("a1.task2.45deg.rightbottom.1diamond", []() {
+	check_line_covers("45 degree line from (1, 0.5) to (0.5, 0)",
+		{ Vec2(1.0f, 0.5f), Vec2(0.5f, 0.0f) },
+		{ "...",
+		".#." }
+		);
+	});
+Test test_a1_task2_45deg_top_to_right_1diamond("a1.task2.45deg.topright.1diamond", []() {
+	check_line_covers("45 degree line from (0.5, 1) to (1, 0.5)",
+		{ Vec2(0.5f, 1.0f), Vec2(1.0f, 0.5f) },
+		{ "#..",
+		"..." }
+		);
+	});
+
 

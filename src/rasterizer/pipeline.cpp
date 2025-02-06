@@ -172,7 +172,7 @@ void Pipeline<primitive_type, Program, flags>::run(std::vector<Vertex> const& ve
 				// A1T4: Blend_Over
 				// TODO: set framebuffer color to the result of "over" blending (also called "alpha blending") the fragment color over the framebuffer color, using the fragment's opacity
 				// 		 You may assume that the framebuffer color has its alpha premultiplied already, and you just want to compute the resulting composite color
-				fb_color = fb_color + sf.color * sf.opacity; 
+				fb_color = (fb_color * (1 - sf.opacity) + sf.color * sf.opacity) / sf.opacity; 
 			} else {
 				static_assert((flags & PipelineMask_Blend) <= Pipeline_Blend_Over, "Unknown blending flag.");
 			}
@@ -409,11 +409,21 @@ void Pipeline<p, P, flags>::rasterize_line(
 
 	int x = x0;
 	int y = y0;
-	auto DiamondExit = [](int x, int y, float x1, float y1, float k) -> bool 
+
+	auto FloatEqual = [](float a, float target) -> bool
+	{
+		return fabs(a - target) <= 1e-9;
+	};
+
+	auto DiamondExit = [&](int x, int y, float x1, float y1, float k) -> bool 
 	{
 		float solution;
 		int count = 0;
 		float b;
+
+		if(FloatEqual((float)x, x1))
+			return false;
+
 		if(std::isinf(k))	// in case k = inf
 		{
 			b = x1 - x;
@@ -439,47 +449,47 @@ void Pipeline<p, P, flags>::rasterize_line(
 		else
 		{
 			b = k * (y1 - y) / (x1 - x);
-		// true shaded false not shaded
-		// if intersection point >= 2 the line must pass through whole diamond
-		// y = x + 0.5f and y = x - 0.5f
-		if(k != 1)
-		{
-			// y = x + 0.5f
-			solution = (0.5f - b) / (k - 1);
-			if(solution >= 0 && solution < 0.5f && solution <=(x1 - x))
-				count++;
-			// y = x - 0.5f
-			solution = (-0.5f - b) / (k - 1);
-			if(solution >= 0.5f && solution < 1 && solution <= (x1 - x))
-				count++;
-		}
-		else
-		{
-			if(b == 0.5f && x1 == x + 0.5f)
-				return true;
-			else if(b == -0.5f && x1 == x + 1.0f)
-				return true;
-		}
+			// true shaded false not shaded
+			// if intersection point >= 2 the line must pass through whole diamond
+			// y = x + 0.5f and y = x - 0.5f
+			if(k != 1)
+			{
+				// y = x + 0.5f
+				solution = (0.5f - b) / (k - 1);
+				if(solution >= 0 && solution < 0.5f && solution <=(x1 - x))
+					count++;
+				// y = x - 0.5f
+				solution = (-0.5f - b) / (k - 1);
+				if(solution >= 0.5f && solution < 1 && solution <= (x1 - x))
+					count++;
+			}
+			else
+			{
+				if(FloatEqual(b, 0.5f) && FloatEqual(x1, x + 0.5f))
+					return true;
+				else if(FloatEqual(b, -0.5f) && FloatEqual(x1, x + 1.0f))
+					return true;
+			}
 
-		// y = -x + 1.5f and y = -x + 0.5f
-		if(k != -1)
-		{
-			// y = -x + 1.5f
-			solution = (1.5f - b) / (k + 1);
-			if(solution > 0.5f && solution < 1.0f && solution <=(x1 - x))
-				count++;
-			// y = -x + 0.5f
-			solution = (0.5f - b) / (k + 1);
-			if(solution >= 0 && solution <= 0.5f && solution <= (x1 - x))
-				count++;
-		}
-		else
-		{
-			if(b == 1.5f)
-				return false;
-			else if(b == 0.5f && y1 - y < 0)
-				return true;
-		}
+			// y = -x + 1.5f and y = -x + 0.5f
+			if(k != -1)
+			{
+				// y = -x + 1.5f
+				solution = (1.5f - b) / (k + 1);
+				if(solution > 0.5f && solution < 1.0f && solution <=(x1 - x))
+					count++;
+				// y = -x + 0.5f
+				solution = (0.5f - b) / (k + 1);
+				if(solution >= 0 && solution <= 0.5f && solution <= (x1 - x))
+					count++;
+			}
+			else
+			{
+				if(FloatEqual(b, 1.5f))
+					return false;
+				else if(FloatEqual(b, 0.5f) && y1 - y < 0)
+					return true;
+			}
 		}
 		return count >=2;
 	};
