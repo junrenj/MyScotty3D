@@ -172,7 +172,7 @@ void Pipeline<primitive_type, Program, flags>::run(std::vector<Vertex> const& ve
 				// A1T4: Blend_Over
 				// TODO: set framebuffer color to the result of "over" blending (also called "alpha blending") the fragment color over the framebuffer color, using the fragment's opacity
 				// 		 You may assume that the framebuffer color has its alpha premultiplied already, and you just want to compute the resulting composite color
-				fb_color = (fb_color * (1 - sf.opacity) + sf.color * sf.opacity) / sf.opacity; 
+				fb_color = fb_color * (1 - sf.opacity) + sf.color * sf.opacity; 
 			} else {
 				static_assert((flags & PipelineMask_Blend) <= Pipeline_Blend_Over, "Unknown blending flag.");
 			}
@@ -382,6 +382,8 @@ void Pipeline<p, P, flags>::rasterize_line(
 	int stepX = 1;
 	int stepY = 1;
 
+	bool isSwap = false;
+
 	// ensure x1 > x0
 	if(x1 < x0)
 	{
@@ -392,6 +394,7 @@ void Pipeline<p, P, flags>::rasterize_line(
 		dx = x1 - x0;
 	    dy = y1 - y0;
 		dz = z1 - z0;
+		isSwap = true;
 	}
 
 	if(y1 < y0)
@@ -415,7 +418,7 @@ void Pipeline<p, P, flags>::rasterize_line(
 		return fabs(a - target) <= 1e-9;
 	};
 
-	auto DiamondExit = [&](int x, int y, float x1, float y1, float k) -> bool 
+	auto DiamondExitEnd = [&](int x, int y, float x1, float y1, float k) -> bool 
 	{
 		float solution;
 		int count = 0;
@@ -430,10 +433,10 @@ void Pipeline<p, P, flags>::rasterize_line(
 			if(b <= 0.5f)
 			{
 				solution = b + 0.5f;
-				if( solution >= 0.5f && solution <= y1 && solution < 1.0f)
+				if( solution > 0.5f && solution <= y1 && solution < 1.0f)
 					count ++;
 				solution = 0.5f - b;
-				if( solution >= 0 && solution <= y1 && solution < 0.5f)
+				if( solution > 0 && solution <= y1 && solution < 0.5f)
 					count ++;
 			}
 			else
@@ -456,7 +459,7 @@ void Pipeline<p, P, flags>::rasterize_line(
 			{
 				// y = x + 0.5f
 				solution = (0.5f - b) / (k - 1);
-				if(solution >= 0 && solution < 0.5f && solution <=(x1 - x))
+				if(solution >= 0 && solution < 0.5f && solution <= (x1 - x))
 					count++;
 				// y = x - 0.5f
 				solution = (-0.5f - b) / (k - 1);
@@ -467,10 +470,9 @@ void Pipeline<p, P, flags>::rasterize_line(
 			{
 				if(FloatEqual(b, 0.5f) && FloatEqual(x1, x + 0.5f))
 					return true;
-				else if(FloatEqual(b, -0.5f) && FloatEqual(x1, x + 1.0f))
+				else if(FloatEqual(b, -0.5f) && FloatEqual(x1, x + 1.0f) && !FloatEqual(x1, x + 0.5f))
 					return true;
 			}
-
 			// y = -x + 1.5f and y = -x + 0.5f
 			if(k != -1)
 			{
@@ -491,7 +493,7 @@ void Pipeline<p, P, flags>::rasterize_line(
 					return true;
 			}
 		}
-		return count >=2;
+		return count >= 2;
 	};
 
 	while(true)
@@ -504,11 +506,28 @@ void Pipeline<p, P, flags>::rasterize_line(
 		frag.derivatives.fill(Vec2(0.0f, 0.0f));
 		frag.attributes = va.attributes;
 
-		if(x == x1 && y == y1)	// end Point Check
+		if(x == x0 && y == y0)
 		{
-			if(DiamondExit(x, y, v1.x, v1.y, slope))
+			if(isSwap)
+			{
+				// check startPoint instead of end point
+				if(DiamondExitEnd(x, y, v0.x, v0.y, (v1.x - v0.x)/(v1.y - v0.y)))
+					emit_fragment(frag);
+			}
+		}
+		if(x == x1 && y == y1)	
+		{
+			if(!isSwap)
+			{
+				// end Point Check
+				if(DiamondExitEnd(x, y, v1.x, v1.y, slope))
+					emit_fragment(frag);
+			}
+			else
+			{
 				emit_fragment(frag);
-				break;
+			}
+			break;
 		}
 		else
 			emit_fragment(frag);
@@ -588,10 +607,24 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 	int maxX = static_cast<int>(std::ceil(std::max({va.fb_position.x, vb.fb_position.x, vc.fb_position.x})));
 	int maxY = static_cast<int>(std::ceil(std::max({va.fb_position.y, vb.fb_position.y, vc.fb_position.y})));
 
-	// ab * ap
-	auto EdgeFunction = [](Vec2 a, Vec2 b, Vec2 p)
+	auto TopLeftEdge = [](Vec2 a, Vec2 b)-> bool
 	{
-		return (b.x - a.x)*(p.y - a.y) - (b.y - a.y)*(p.x -a.x);
+		bool b1 = a.y == b.y && a.x > b.x;	// true mean it is the top edge false mean it is the bottom
+		bool b2 = a.y < b.y; // because it is clockwise, so b.y > a.y, true mean it is left edge
+		return b1 || b2 ;
+	};
+
+	// ab * ap
+	auto EdgeFunction = [&](Vec2 a, Vec2 b, Vec2 p) -> float
+	{
+		float edgeValue = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+		if(edgeValue == 0)
+		{
+			// mean point Q is on the edge. So we have to check whether the edge is the top left
+			if(TopLeftEdge(a, b))
+				edgeValue = -10000;
+		}
+    	return edgeValue;
 	};
 
 
@@ -618,10 +651,16 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 				for (int dx = 0; dx < 2; dx++)
 				{
 					Vec2 target = Vec2(x + dx + 0.5f, y + dy + 0.5f);
+					// clockwise 
 					float alpha = EdgeFunction(b, c, target);
 					float beta = EdgeFunction(c, a, target);
 					float gamma = EdgeFunction(a, b, target);
 
+					// check top left rule
+					if(alpha == -10000 || beta == -10000 || gamma == -10000)
+						continue;
+
+					// point insides the triangle
 					if(alpha >= 0 && beta >= 0 && gamma >= 0 || alpha <= 0 && beta <= 0 && gamma <= 0)
 					{
 						alpha /= area;
@@ -652,11 +691,10 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 								float attribute = alpha * va.attributes[i] * va.inv_w 
 														+ beta * vb.attributes[i] * vb.inv_w
 														+ gamma * vc.attributes[i] * vc.inv_w;
-								frags[dx][dy].attributes[i] = static_cast<float>(wp * attribute);
+								frags[dx][dy].attributes[i] = wp * attribute;
 							}
 						}
 						validates[dx][dy] = true;
-						emit_fragment(frags[dx][dy]);
 					}
 				}
 			}
@@ -666,7 +704,6 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 			{
 				for (int dx = 0; dx < 2; dx++)
 				{
-					
 					if(!validates[dx][dy])
 						continue;
 
@@ -684,16 +721,12 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 						if(validates[dx][iy])
 							dfy = dy == 0 ? frags[dx][iy].attributes[i] - fragTarget.attributes[i] : 
 											fragTarget.attributes[i] - frags[dx][iy].attributes[i];
-
 						fragTarget.derivatives[i] = Vec2(dfx, dfy);
 					}
+					
+					emit_fragment(frags[dx][dy]);
 				}
-				
 			}
-			
-			
-
-			
 		}
 	}
 }
