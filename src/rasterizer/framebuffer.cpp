@@ -31,11 +31,22 @@ HDR_Image Framebuffer::resolve_colors() const {
 
 	HDR_Image image(width, height);
 
-	for (uint32_t y = 0; y < height; ++y) {
-		for (uint32_t x = 0; x < width; ++x) {
-			image.at(x, y) = color_at(x, y, 0);
+	for (uint32_t y = 0; y < height; ++y) 
+	{
+		for (uint32_t x = 0; x < width; ++x) 
+		{
+			Spectrum finalCol = Spectrum(0.0f);
+			float totalWeight = 0.0f;
+
+			for (uint32_t s = 0; s < sample_pattern.centers_and_weights.size(); s++)
+			{
+				float weight = sample_pattern.centers_and_weights[s].z;
+				finalCol += color_at(x, y, s) * weight;
+				totalWeight += weight;
+			}
+			finalCol = finalCol / totalWeight;
+			image.at(x, y) = finalCol;
 		}
 	}
-
 	return image;
 }

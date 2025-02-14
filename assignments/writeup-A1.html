@@ -99,6 +99,8 @@ Insert a picture of your sample pattern here (up to you on how you created it):
 
 Explanation of what your SamplePattern does and scenarios it would do well and poorly in:
 
+I used the Rotated Grid Supersampling (RGSS) method, which is suitable for anti-aliasing along diagonal edges or lines, helping to avoid artifacts caused by regular grid supersampling. However, it may perform poorly in scenarios where the entire scene's pixels are tilted at a certain angle, and this angle happens to align closely with the rotated grid. In such cases, the anti-aliasing effect might not be optimal. Therefore, the specific rotation angle may need to be adjusted based on the actual scene.
+
 Your completion will be graded based on the above answer, the reference `test.a1.task7.cpp` file and 
 checking that rasterizing the samplers scene will look decent.
 
