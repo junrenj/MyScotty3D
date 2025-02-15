@@ -664,9 +664,9 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 	};
 
 	// ab * ap
-	auto EdgeFunction = [&](Vec2 a, Vec2 b, Vec2 p) -> float
+	auto EdgeFunction = [&](Vec2 a, Vec2 b, Vec2 tar) -> float
 	{
-		float edgeValue = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+		float edgeValue = (b.x - a.x) * (tar.y - a.y) - (b.y - a.y) * (tar.x - a.x);
 		if(edgeValue == 0)
 		{
 			// mean point Q is on the edge. So we have to check whether the edge is the top left
@@ -823,7 +823,7 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 				if(j == 0)
 				{
 					// point insides the triangle
-					if(alpha >= 0 && beta >= 0 && gamma >= 0 || alpha <= 0 && beta <= 0 && gamma <= 0)
+					if((alpha >= 0 && beta >= 0 && gamma >= 0) || (alpha <= 0 && beta <= 0 && gamma <= 0))
 						validate = true;
 					// check top left rule
 					if(alpha == -10000 || beta == -10000 || gamma == -10000)
