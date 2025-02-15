@@ -98,7 +98,7 @@ void Pipeline<primitive_type, Program, flags>::run(std::vector<Vertex> const& ve
 		// helper used to put output of rasterization functions into fragments:
 		auto emit_fragment = [&](Fragment const& f) { fragments.emplace_back(f); };
 
-		for (int j = 0; j < clipped_vertices.size(); j++)
+		for (int j = 0; j < (int)clipped_vertices.size(); j++)
 		{
 			// SUPERSAMPLING
 			float offsetX = samples[s].x - 0.5f;
@@ -802,7 +802,7 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 				else if constexpr ((flags & PipelineMask_Interp) == Pipeline_Interp_Smooth) 
 				{
 					// A1T5: screen-space smooth triangles
-					for (int i = 0; i < va.attributes.size(); i++)
+					for (int i = 0; i < (int)va.attributes.size(); i++)
 					{
 						frags[j].attributes[i] = alpha * va.attributes[i] + beta * vb.attributes[i] + gamma * vc.attributes[i];
 					}
