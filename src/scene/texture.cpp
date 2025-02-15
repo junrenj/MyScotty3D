@@ -58,8 +58,8 @@ Spectrum sample_trilinear(HDR_Image const &base, std::vector< HDR_Image > const 
 	}
 	else
 	{
-		unsigned int low = unsigned int(std::min(std::floor(goodLod), (float)levels.size()));
-		unsigned int high = std::min(low + 1, (unsigned int)levels.size());
+		uint32_t low = static_cast<uint32_t>(std::min(std::floor(goodLod), (float)levels.size()));
+		uint32_t high = static_cast<uint32_t>(low + 1u) > static_cast<uint32_t>(levels.size()) ?  static_cast<uint32_t>(levels.size()) : static_cast<uint32_t>(low + 1u);
 		float t = goodLod - low;
 		Spectrum s1 = goodLod < 1.0f ? sample_bilinear(base, uv) : sample_bilinear(levels[low - 1], uv);
 		Spectrum s2 = sample_bilinear(levels[high - 1], uv);
