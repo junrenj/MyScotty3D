@@ -812,7 +812,7 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 					// 1/wp = alpha/wa + beta/wb + gamma/wc
 					float wpInverse = alpha * va.inv_w + beta * vb.inv_w + gamma * vc.inv_w;
 					float wp = 1 / wpInverse;
-					for (int i = 0; i < va.attributes.size(); i++)
+					for (int i = 0; i < (int)va.attributes.size(); i++)
 					{
 						float attribute = alpha * va.attributes[i] * va.inv_w 
 												+ beta * vb.attributes[i] * vb.inv_w
@@ -831,7 +831,7 @@ void Pipeline<p, P, flags>::rasterize_triangle(
 				}
 			}
 
-			for (int i = 0; i < frags[0].derivatives.size(); i++)
+			for (int i = 0; i < (int)frags[0].derivatives.size(); i++)
 			{
 				frags[0].derivatives[i] = Vec2(frags[1].attributes[i] - frags[0].attributes[i], frags[2].attributes[i] - frags[0].attributes[i]);
 			}
