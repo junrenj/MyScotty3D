@@ -437,7 +437,7 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::extrude_face(FaceRef f) {
 	} while (h1 != f->halfedge);
 
 	// Create new vertices
-	for (int i = 0; i < faceVertices_old.size(); i++)
+	for (int i = 0; i < static_cast<int>(faceVertices_old.size()); i++)
 	{
 		VertexRef newVertex = emplace_vertex();
 		newVertex->position = faceVertices_old[i]->position;
@@ -448,7 +448,7 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::extrude_face(FaceRef f) {
 	// Create halfedges of new vertices in inner face
 	std::vector<HalfedgeRef> twinHalfedges;
 	std::vector<HalfedgeRef> halfHalfedges;
-	for (int i = 0; i < faceVertices_new.size(); i++)
+	for (int i = 0; i < static_cast<int>(faceVertices_new.size()); i++)
 	{
 		HalfedgeRef newTwin = emplace_halfedge();
 		HalfedgeRef newHalf = emplace_halfedge();
@@ -459,20 +459,20 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::extrude_face(FaceRef f) {
 		faceVertices_new[i]->halfedge = newHalf;
 	}
 	// Connect new halfedges with each other & create edges
-	for (int i = 0; i < twinHalfedges.size(); i++)
+	for (int i = 0; i <  static_cast<int>(twinHalfedges.size()); i++)
 	{
 		EdgeRef newEdge = emplace_edge();
-		halfHalfedges[i]->next = halfHalfedges[(i + 1) > (halfHalfedges.size() - 1) ? 0 : (i + 1)];
-		halfHalfedges[i]->twin = twinHalfedges[(i + 1) > (twinHalfedges.size() - 1) ? 0 : (i + 1)];
+		halfHalfedges[i]->next = halfHalfedges[(i + 1) > (static_cast<int>(halfHalfedges.size()) - 1) ? 0 : (i + 1)];
+		halfHalfedges[i]->twin = twinHalfedges[(i + 1) > (static_cast<int>(twinHalfedges.size()) - 1) ? 0 : (i + 1)];
 		halfHalfedges[i]->edge = newEdge;
 		halfHalfedges[i]->twin->edge = newEdge;
 		newEdge->halfedge = halfHalfedges[i];
 
-		twinHalfedges[i]->next = twinHalfedges[(i - 1) < 0 ? (twinHalfedges.size() - 1) : (i - 1)];
-		twinHalfedges[i]->twin = halfHalfedges[(i - 1) < 0 ? (halfHalfedges.size() - 1) : (i - 1)];
+		twinHalfedges[i]->next = twinHalfedges[(i - 1) < 0 ? (static_cast<int>(twinHalfedges.size()) - 1) : (i - 1)];
+		twinHalfedges[i]->twin = halfHalfedges[(i - 1) < 0 ? (static_cast<int>(halfHalfedges.size()) - 1) : (i - 1)];
 	}
 	// Connect old halfedges to new halfedges(also have to create new edges and halfedges)
-	for (int i = 0; i < twinHalfedges.size(); i++)
+	for (int i = 0; i <  static_cast<int>(twinHalfedges.size()); i++)
 	{
 		EdgeRef newEdge = emplace_edge();
 		HalfedgeRef h = emplace_halfedge();
@@ -484,15 +484,15 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::extrude_face(FaceRef f) {
 		newEdge->halfedge = h;
 
 		faceHalfedge_old[i]->next = h;
-		h->next = twinHalfedges[(i + 1) > (twinHalfedges.size() - 1) ? 0 : (i + 1)];
-		h->vertex = faceHalfedge_old[(i + 1) > (twinHalfedges.size() - 1) ? 0 : (i + 1)]->vertex;
+		h->next = twinHalfedges[(i + 1) > (static_cast<int>(twinHalfedges.size()) - 1) ? 0 : (i + 1)];
+		h->vertex = faceHalfedge_old[(i + 1) > (static_cast<int>(twinHalfedges.size()) - 1) ? 0 : (i + 1)]->vertex;
 		twinHalfedges[(i + 2)%(twinHalfedges.size())]->next = t;
-		t->next = faceHalfedge_old[(i + 1) > (twinHalfedges.size() - 1) ? 0 : (i + 1)];
-		t->vertex = faceVertices_new[(i + 1) > (twinHalfedges.size() - 1) ? 0 : (i + 1)];
+		t->next = faceHalfedge_old[(i + 1) > (static_cast<int>(twinHalfedges.size()) - 1) ? 0 : (i + 1)];
+		t->vertex = faceVertices_new[(i + 1) > ( static_cast<int>(twinHalfedges.size() - 1)) ? 0 : (i + 1)];
 	}
 	// Assign Face
 	AssignFaceToHalfedge(halfHalfedges[0], f);
-	for (int i = 0; i < faceHalfedge_old.size(); i++)
+	for (int i = 0; i <  static_cast<int>(faceHalfedge_old.size()); i++)
 	{
 		FaceRef newFace = emplace_face();
 		AssignFaceToHalfedge(faceHalfedge_old[i], newFace);
@@ -824,7 +824,7 @@ void Halfedge_Mesh::extrude_positions(FaceRef face, Vec3 move, float shrink) {
 
 	face->center() += move;
 	Vec3 center = face->center();
-	for (int i = 0; i < faceVertices.size(); i++)
+	for (int i = 0; i <  static_cast<int>(faceVertices.size()); i++)
 	{
 		// Step 1 Move
 		faceVertices[i]->position += move;
