@@ -562,8 +562,6 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::extrude_face(FaceRef f) {
 	}
 
 	// Remember to also fill in extrude_helper (A2L4h)
-	// extrude_positions(f, Vec3(0.0f), 0.5f);
-	// std::cout << describe() << std::endl;
 
     return f;
 }
@@ -597,19 +595,25 @@ std::optional<Halfedge_Mesh::EdgeRef> Halfedge_Mesh::flip_edge(EdgeRef e) {
 		FaceRef f1 = h->face;
 		FaceRef f2 = t->face;
 
+		// special case 1: v3 connect to v4
+		if(v3->halfedge->next->vertex == v4)
+			return std::nullopt;
+		HalfedgeRef toH = h;
+		HalfedgeRef toT = t;
+		do
+		{
+			toH = toH->next;
+		}while(toH->next != h);do
+		{
+			toT = toT->next;
+		}while(toT->next != t);
+		// special case 2: v1/v2 only connect to two edges
+		if(toH->twin == t->next || toT->twin == h->next)
+			return std::nullopt;
+		
 		// halfedge->next == h || t
-		HalfedgeRef ph = h;
-		HalfedgeRef pt = t;
-		do
-		{
-			ph = ph->next;
-		}while(ph->next != h);
-		ph->next = t->next;		// instead of point to h, replace it with t->next
-		do
-		{
-			pt = pt->next;
-		}while(pt->next != t);
-		pt->next = h->next;		// instead of point to t, replace it with h->next
+		toH->next = t->next;		// instead of point to h, replace it with t->next
+		toT->next = h->next;		// instead of point to t, replace it with h->next
 
 		// disconnect
 		v1->halfedge = h->next;
@@ -688,12 +692,109 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::dissolve_edge(EdgeRef e) {
  */
 std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(EdgeRef e) {
 	//A2L3: Collapse Edge
+	// Collect data
+
+	HalfedgeRef h = e->halfedge;
+	HalfedgeRef t = h->twin;
+	HalfedgeRef toH = h;
+	HalfedgeRef toT = t;
+	VertexRef v0 = h->vertex;
+	VertexRef v1 = t->vertex;
+	FaceRef f1 = h->face;
+	FaceRef f2 = t->face;
+	do
+	{
+		toH = toH->next;
+	} while (toH-> next != h);
+	do
+	{
+		toT = toT->next;
+	} while (toT-> next != t);
+
+	
+	// method combine h->vertex which mean we have to reconnect t->vertex side data
+	// Step 1: Move vertex h
+	v0->position = (v0->position + v1->position) / 2.0f;
+
+	//Step 2 : Disconnect other halfedge
+	toT->next = t->next;
+	toH->next = h->next;
+	h->next->vertex = v0;
+	h->next->twin->next->vertex = v0;
+	toT->twin->vertex = v0;
+	f1->halfedge = h->next;
+	f2->halfedge = t->next;
+	v0->halfedge = h->next;
+
+	auto CheckEraseFace = [&](FaceRef fDelete, VertexRef vDelete)
+	{
+		HalfedgeRef targetH = fDelete->halfedge;
+		if(fDelete->degree() < 3)
+		{
+			// which mean omly two edges to construct a triangle
+			HalfedgeRef targetTwin = targetH->twin;
+	 		HalfedgeRef targetNextTwin = targetH->next->twin;
+			VertexRef v3 = targetH->next->vertex;
+			EdgeRef eDelete = targetH->edge;
+			// make two pairs into one pair
+			targetNextTwin->twin = targetTwin;
+			targetTwin->twin = targetNextTwin;
+			// assign another edge
+			targetTwin->edge = targetNextTwin->edge;
+			targetNextTwin->edge->halfedge = targetTwin;
+			// assign vertex with new halfedge
+			vDelete->halfedge = vDelete->halfedge->next->twin;
+			v3->halfedge = targetTwin;
+
+			// erase 
+			erase_halfedge(targetH->next);
+			erase_halfedge(targetH);
+			erase_edge(eDelete);
+			erase_face(fDelete);
+		}
+	};
+	
+	CheckEraseFace(f1, v0);
+	CheckEraseFace(f2, v1);
+	// if(e->on_boundary())
+	// {
+	// 	FaceRef fDelete = f1->boundary ? f2 : f1;
+	// 	HalfedgeRef targetH = f1->halfedge;
+	// 	if(fDelete->degree() < 3)
+	// 	{
+	// 		// which mean omly two edges to construct a triangle
+	// 		HalfedgeRef targetTwin = targetH->twin;
+	//  		HalfedgeRef targetNextTwin = targetH->next->twin;
+	// 		VertexRef v3 = targetH->next->vertex;
+	// 		EdgeRef eDelete = targetH->edge;
+	// 		// make two pairs into one pair
+	// 		targetNextTwin->twin = targetTwin;
+	// 		targetTwin->twin = targetNextTwin;
+	// 		// assign another edge
+	// 		targetTwin->edge = targetNextTwin->edge;
+	// 		targetNextTwin->edge->halfedge = targetTwin;
+	// 		// assign vertex with new halfedge
+	// 		v0->halfedge = v0->halfedge->next->twin;
+	// 		v3->halfedge = targetTwin;
+
+	// 		// erase 
+	// 		erase_halfedge(targetH->next);
+	// 		erase_halfedge(targetH);
+	// 		erase_edge(eDelete);
+	// 		erase_face(fDelete);
+	// 	}
+	// }
+
+	// Last Step erase h\t\e
+	erase_edge(e);
+	erase_halfedge(h);
+	erase_halfedge(t);
+	erase_vertex(v1);
+
 
 	//Reminder: use interpolate_data() to merge corner_uv / corner_normal data on halfedges
 	// (also works for bone_weights data on vertices!)
-
-	
-    return std::nullopt;
+    return v0;
 }
 
 /*

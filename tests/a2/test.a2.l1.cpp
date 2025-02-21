@@ -96,3 +96,198 @@ Test test_a2_l1_flip_edge_edge_boundary("a2.l1.flip_edge.edge.boundary", []() {
 	}
 });
 
+// Kim Test case
+/*
+  2
+ / \
+0---1
+ \ /
+  3
+
+Flip edge 0-1
+
+After mesh:
+  2
+ /|\
+0 | 1
+ \|/
+  3
+ */
+
+ Test test_a2_l1_flip_doubletriangle("a2.l1.flip_edge.edge.doubletriangle", []() {
+    Halfedge_Mesh mesh = Halfedge_Mesh::from_indexed_faces({
+        Vec3(-1.0f, 0.0f, 0.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f),
+        Vec3(0.0f, -1.0f, 0.0f)
+    }, {
+        {0, 1, 2},
+        {0, 3, 1}
+    });
+
+    Halfedge_Mesh::EdgeRef edge = mesh.halfedges.begin()->edge;
+
+    Halfedge_Mesh after = Halfedge_Mesh::from_indexed_faces({
+        Vec3(-1.0f, 0.0f, 0.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f),
+        Vec3(0.0f, -1.0f, 0.0f)
+    }, {
+        {0, 3, 2},
+        {3, 1, 2}
+    });
+
+    expect_flip(mesh, edge, after);
+
+});
+
+
+/*
+  - 2
+ / / \
+4-0---1
+ \ \ /
+  - 3
+
+Flip edge 0-1
+
+After mesh:
+  - 2
+ / /|\
+4-0 | 1
+ \ \|/
+  - 3
+ */
+
+Test test_a2_l1_flip_embedded_doubletriangle("a2.l1.flip_edge.edge.embedded_doubletriangle", []() {
+    Halfedge_Mesh mesh = Halfedge_Mesh::from_indexed_faces({
+        Vec3(-1.0f, 0.0f, 0.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f),
+        Vec3(0.0f, -1.0f, 0.0f), Vec3(-2.0f, 0.0f, 0.0f)
+    }, {
+        {0, 1, 2},
+        {0, 3, 1},
+        {2, 4, 3, 0}
+    });
+
+    Halfedge_Mesh::EdgeRef edge = mesh.halfedges.begin()->edge;
+
+    Halfedge_Mesh after = Halfedge_Mesh::from_indexed_faces({
+        Vec3(-1.0f, 0.0f, 0.0f), Vec3(1.0f, 0.0f, 0.0f), Vec3(0.0f, 1.0f, 0.0f),
+        Vec3(0.0f, -1.0f, 0.0f), Vec3(-2.0f, 0.0f, 0.0f)
+    }, {
+        {0, 3, 2},
+        {3, 1, 2},
+        {2, 4, 3, 0}
+    });
+
+    expect_flip(mesh, edge, after);
+
+});
+
+// Nellie Test case
+/*
+EDGE CASE
+
+Initial mesh:
+0--1--2
+|  |  |
+|  3  |
+|  |  |
+4--5--6
+
+Flip Edge on Edge: 1-3
+
+After mesh:
+0--1--2
+|  |  |
+|  3  |
+|  |  |
+4--5--6
+*/
+Test test_a2_l1_flip_edge_orphaned_vertex_1("a2.l1.flip_edge.orphaned_vertex.1", []() {
+    Halfedge_Mesh mesh = Halfedge_Mesh::from_indexed_faces({
+        Vec3(-1.0f, 1.1f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(1.1f, 1.0f, 0.0f),
+                        Vec3(0.0f, 0.0f, 0.0f),
+        Vec3(-1.3f,-0.7f, 0.0f), Vec3(0.0f, -1.0f, 0.0f), Vec3(1.4f, -1.0f, 0.0f)
+    }, {
+        {0, 4, 5, 3, 1}, 
+        {1, 3, 5, 6, 2}
+    });
+    Halfedge_Mesh::EdgeRef edge = mesh.halfedges.begin()->next->next->next->edge;
+
+if (mesh.flip_edge(edge)) {
+        throw Test::error("flip_edge should not work at the boundary.");
+    }
+});
+
+/*
+EDGE CASE
+
+Initial Mesh:
+  /0\
+ / | \
+1  2  3
+ \ | /
+  \4/
+
+Flip Edge on Edge: 0-2
+
+After Mesh:
+  /0\
+ / | \
+1  2  3
+ \ | /
+  \4/
+*/
+Test test_a2_l1_flip_edge_orphaned_vertex_2("a2.l1.flip_edge.orphaned_vertex.2", []() {
+    Halfedge_Mesh mesh = Halfedge_Mesh::from_indexed_faces({
+                        Vec3(0.0f, 1.0f, 0.0f), 
+        Vec3(-1.0f, 0.0f, 0.0f), Vec3(0.0f, 0.0f, 0.0f), Vec3(1.0f, 0.0f, 0.0f),
+                        Vec3(0.0f, -1.0f, 0.0f)
+    }, {
+        {0, 1, 4, 2}, 
+        {0, 2, 4, 3}
+    });
+    Halfedge_Mesh::EdgeRef edge = mesh.halfedges.begin()->next->next->next->edge;
+
+if (mesh.flip_edge(edge)) {
+        throw Test::error("flip_edge should not work at the boundary.");
+    }
+});
+
+/*
+EDGE CASE
+
+Initial Mesh:
+0--1--2
+|  |  |
+|  3  |
+|  |  |
+|  4  |
+|  |  |
+5--6--7
+
+Flip Edge on Edge: 3-4
+
+After Mesh:
+0--1--2
+|  |  |
+|  3  |
+|  |  |
+|  4  |
+|  |  |
+5--6--7
+*/
+Test test_a2_l1_flip_edge_orphaned_vertex_3("a2.l1.flip_edge.orphaned_vertex.3", []() {
+    Halfedge_Mesh mesh = Halfedge_Mesh::from_indexed_faces({
+        Vec3(-1.0f, 1.1f, 0.0f), Vec3(0.0f, 1.0f, 0.0f), Vec3(1.1f, 1.0f, 0.0f),
+                        Vec3(0.0f, 0.0f, 0.0f),
+                        Vec3(0.35f, -0.4f, 0.0f),
+        Vec3(-1.3f,-1.0f, 0.0f), Vec3(0.0f, -1.0f, 0.0f), Vec3(1.4f, -1.0f, 0.0f)
+    }, {
+        {0, 5, 6, 4, 3, 1}, 
+        {1, 3, 4, 6, 7, 2}
+    });
+    Halfedge_Mesh::EdgeRef edge = mesh.halfedges.begin()->next->next->next->edge;
+
+if (mesh.flip_edge(edge)) {
+        throw Test::error("flip_edge should not work at the boundary.");
+    }
+});
+
