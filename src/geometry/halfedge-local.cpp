@@ -547,9 +547,6 @@ std::optional<Halfedge_Mesh::EdgeRef> Halfedge_Mesh::flip_edge(EdgeRef e) {
 		// special case 2: v1/v2 only connect to two edges
 		if(toH->twin == t->next || toT->twin == h->next)
 			return std::nullopt;
-		// special case 3: h and t are not on the same plane
-		if(f1->normal() != f2->normal())
-			return std::nullopt;
 		
 		// halfedge->next == h || t
 		toH->next = t->next;		// instead of point to h, replace it with t->next
