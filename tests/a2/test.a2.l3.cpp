@@ -423,6 +423,131 @@ Test test_a2_l3_collapse_pentagon_boundary("a2.l3.collapse_edge.pentagon.boundar
     expect_collapse(pentagon, edge, doubletriangle);
 });
 
+// test case from Andrew Shanno
+/*
+    0
+ /  |  \
+1   |   2
+| \ | / |
+|   3   |
+|   |   |
+4---5---6
+
+collapse 3 - 5
+
+    0
+ /  |  \
+1   |   2
+| \ | / |
+|   3   |
+| /   \ |  
+4       5
+*/
+
+Test test_a2_l3_collapse_pentagon_star("a2.l3.collapse_edge.pentagon.star", []() {
+    Halfedge_Mesh pentagon = Halfedge_Mesh::from_indexed_faces({
+        Vec3(2.0f, 2.0f, 0.0f), 
+        Vec3(1.0f, 1.0f, 0.0f), Vec3(3.0f, 1.0f, 0.0f),
+        Vec3(2.0f, 0.0f, 0.0f),
+        Vec3(1.0f, -1.0f, 0.0f), Vec3(2.0f, -1.0f, 0.0f), Vec3(3.0f, -1.0f, 0.0f),
+    }, {
+        {0, 1, 3},
+        {0, 3, 2},
+        {1, 4, 5, 3},
+        {3, 5, 6, 2},
+    });
+
+    Halfedge_Mesh::EdgeRef edge = pentagon.halfedges.begin()->next->twin->next->next->next->edge;
+    
+    Halfedge_Mesh after = Halfedge_Mesh::from_indexed_faces({
+        Vec3(2.0f, 2.0f, 0.0f), 
+        Vec3(1.0f, 1.0f, 0.0f), Vec3(3.0f, 1.0f, 0.0f),
+        Vec3(2.0f, -0.5f, 0.0f),
+        Vec3(1.0f, -1.0f, 0.0f), Vec3(3.0f, -1.0f, 0.0f),
+    }, {
+        {0, 1, 3},
+        {0, 3, 2},
+        {1, 4, 3},
+        {3, 5, 2},
+    });
+    expect_collapse(pentagon, edge, after);
+});
+
+/*
+    0
+ /  |  
+1   |   2
+| \ | / |
+|   3   |
+|   |   |
+4---5---6
+
+collapse 0 - 3
+
+0---1---2
+|   |   |
+|   |   |
+|   |   |
+3---4---5
+*/
+
+Test test_a2_l3_collapse_pentagon_adj_squares("a2.l3.collapse_edge.pentagon.adj.squares", []() {
+    Halfedge_Mesh pentagon = Halfedge_Mesh::from_indexed_faces({
+        Vec3(2.0f, 2.0f, 0.0f), 
+        Vec3(1.0f, 1.0f, 0.0f), Vec3(3.0f, 1.0f, 0.0f),
+        Vec3(2.0f, 0.0f, 0.0f),
+        Vec3(1.0f, -1.0f, 0.0f), Vec3(2.0f, -1.0f, 0.0f), Vec3(3.0f, -1.0f, 0.0f),
+    }, {
+        {0, 1, 3},
+        {1, 4, 5, 3},
+        {3, 5, 6, 2},
+    });
+
+    Halfedge_Mesh::EdgeRef edge = pentagon.halfedges.begin()->next->next->edge;
+    
+    Halfedge_Mesh after = Halfedge_Mesh::from_indexed_faces({
+        Vec3(1.0f, 1.0f, 0.0f), Vec3(2.0f, 1.0f, 0.0f), Vec3(3.0f, 1.0f, 0.0f),
+        Vec3(1.0f, -1.0f, 0.0f), Vec3(2.0f, -1.0f, 0.0f), Vec3(3.0f, -1.0f, 0.0f),
+    }, {
+        {0, 3, 4, 1},
+        {1, 4, 5, 2}
+    });
+    expect_collapse(pentagon, edge, after);
+});
+
+/*
+0-----1
+| \   |
+|   \ |
+2-----3
+
+collapse 2-3
+
+0-----1
+ \   / 
+   2 
+*/
+
+Test test_a2_l3_collapse_adj_triangles("a2.l3.collapse_edge.adj.triangles", []() {
+    Halfedge_Mesh square = Halfedge_Mesh::from_indexed_faces({
+        Vec3(-1.0f, 1.0f, 0.0f), Vec3(1.0f, 1.0f, 0.0f),
+        Vec3(-1.0f, -1.0f, 0.0f), Vec3(1.0f, -1.0f, 0.0f),
+    }, {
+        {0, 2, 3},
+        {0, 3, 1},
+    });
+
+    Halfedge_Mesh::EdgeRef edge = square.halfedges.begin()->next->edge;
+    
+    Halfedge_Mesh after = Halfedge_Mesh::from_indexed_faces({
+        Vec3(-1.0f, 1.0f, 0.0f), Vec3(1.0f, 1.0f, 0.0f),
+        Vec3(0.0f, -1.0f, 0.0f),
+    }, {
+        {0, 2, 1},
+    });
+    expect_collapse(square, edge, after);
+});
+
 
 /*
 0

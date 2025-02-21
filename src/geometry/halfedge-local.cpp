@@ -243,13 +243,12 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::split_edge(EdgeRef e) {
 		toT_Old = toT_Old->next;
 	} while (toT_Old-> next != t);
 
-	std::cout << f1->halfedge->id << std::endl;
-
 	// Step 1: new Vertex
 	// Creat new vertex
 	VertexRef newV = emplace_vertex();
 	// Caculate new position
 	newV->position = (v1->position + v2->position) / 2.0f;
+	interpolate_data({v1, v2}, newV);
 
 	// Step 2 : Create two halfedges and one edge for broken h & t
 	EdgeRef t_h_half_edge = emplace_edge();
@@ -313,79 +312,12 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::split_edge(EdgeRef e) {
 	if(!f1->boundary)
 	{
 		ConnectTwoVertex(v3, h, h_half, true, f1);
-		// Step 3.1 Create two halfedges and one edge for V3
-		// EdgeRef v3_edge_newV = emplace_edge();
-		// HalfedgeRef v3_newV = emplace_halfedge();
-		// HalfedgeRef newV_v3 = emplace_halfedge();
-		// v3_newV->twin = newV_v3;
-		// newV_v3->twin = v3_newV;
-		// v3_edge_newV->halfedge = v3_newV;
-		// v3_newV->edge = v3_edge_newV;
-		// newV_v3->edge = v3_edge_newV;
-		// // Step 3.2 Update v3_newV 、 newV_v3 vertex
-		// v3_newV->vertex = v3;
-		// newV_v3->vertex = newV;
-		// // Step 3.3 : Update v3_newV、newV_v3、h_half h->next next*
-		// v3_newV->next = h;
-		// newV_v3->next = h->next->next;
-		// // Step 3.4 : Connect other halfedge 
-		// h_half->next = newV_v3;
-		// h->next->next = v3_newV;
-		// // Step 3.5 : Assign new face
-		// FaceRef f3 = emplace_face();
-		// f3->halfedge = newV_v3;
-		// HalfedgeRef startH = newV_v3;
-		// do
-		// {
-		// 	startH->face = f3;
-		// 	startH = startH->next;
-		// } while (startH != newV_v3);
-		// startH = h;
-		// do
-		// {
-		// 	startH->face = f1;
-		// 	startH = startH->next;
-		// } while (startH != h);
 	}
 
 	// Step 4: Create two pairs halfedges for v4
 	if(!f2->boundary)
 	{
 		ConnectTwoVertex(v4, t_half, t, false, f2);
-
-		// Step 4.1 Create two halfedges and one edge for V3
-		// EdgeRef v4_edge_newV = emplace_edge();
-		// HalfedgeRef v4_newV = emplace_halfedge();
-		// HalfedgeRef newV_v4 = emplace_halfedge();
-		// v4_newV->twin = newV_v4;
-		// newV_v4->twin = v4_newV;
-		// v4_edge_newV->halfedge = v4_newV;
-		// v4_newV->edge = v4_edge_newV;
-		// newV_v4->edge = v4_edge_newV;
-		// // Step 4.2 Update v4_newV 、 newV_v4 vertex
-		// v4_newV->vertex = v4;
-		// newV_v4->vertex = newV;
-		// // Step 4.3 : Update v4_newV、newV_v4 next*
-		// v4_newV->next = t_half;
-		// newV_v4->next = t_half->next->next;
-		// // Step 4.4 : Connect other halfedge 
-		// t->next = newV_v4;
-		// t_half->next->next = v4_newV;
-		// // Step 4.5 : Assign new face
-		// FaceRef f4 = emplace_face();
-		// f4->halfedge = v4_newV;
-		// HalfedgeRef startH = v4_newV;
-		// do
-		// {
-		// 	startH->face = f4;
-		// 	startH = startH->next;
-		// } while (startH != v4_newV);
-		// startH = t;
-		// do
-		// {
-		// 	startH->face = f2;
-		// 	startH = startH->next;
-		// } while (startH != t);
 	}
     return newV;
 }
@@ -476,6 +408,10 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::bevel_edge(EdgeRef e) {
 std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::extrude_face(FaceRef f) {
 	//A2L4: Extrude Face
 	// Reminder: This function does not update the vertex positions.
+	// Special case : boundary face is invalid.
+	if(f->boundary)
+		return std::nullopt;
+
 	std::vector<HalfedgeRef> faceHalfedge_old;
 	std::vector<VertexRef> faceVertices_old;
 	std::vector<VertexRef> faceVertices_new;
@@ -505,6 +441,7 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::extrude_face(FaceRef f) {
 	{
 		VertexRef newVertex = emplace_vertex();
 		newVertex->position = faceVertices_old[i]->position;
+		interpolate_data({faceVertices_old[i]}, newVertex);
 		faceVertices_new.emplace_back(newVertex);
 	}
 
@@ -610,6 +547,9 @@ std::optional<Halfedge_Mesh::EdgeRef> Halfedge_Mesh::flip_edge(EdgeRef e) {
 		// special case 2: v1/v2 only connect to two edges
 		if(toH->twin == t->next || toT->twin == h->next)
 			return std::nullopt;
+		// special case 3: h and t are not on the same plane
+		if(f1->normal() != f2->normal())
+			return std::nullopt;
 		
 		// halfedge->next == h || t
 		toH->next = t->next;		// instead of point to h, replace it with t->next
@@ -633,6 +573,20 @@ std::optional<Halfedge_Mesh::EdgeRef> Halfedge_Mesh::flip_edge(EdgeRef e) {
 		// update loop
 		v1->halfedge->next = t;
 		v2->halfedge->next = h;
+
+		HalfedgeRef h1 = h;
+		do
+		{
+			h1->face = h->face;
+			h1 = h1->next;
+		} while (h1 != h);
+		h1 = t;
+		do
+		{
+			h1->face = t->face;
+			h1 = h1->next;
+		} while (h1 != t);
+		
 
 		return e;
 	}
@@ -710,7 +664,7 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(EdgeRef e) 
 	{
 		toT = toT->next;
 	} while (toT-> next != t);
-	
+
 	// Special case : single triangle
 	if(h->next->twin == toT && t->next->twin == toH)
 		return std::nullopt;
@@ -719,6 +673,7 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(EdgeRef e) 
 	// method combine h->vertex which mean we have to reconnect t->vertex side data
 	// Step 1: Move vertex h
 	v0->position = (v0->position + v1->position) / 2.0f;
+	interpolate_data({v0, v1}, v0);
 
 	//Step 2 : Disconnect other halfedge
 	toT->next = t->next;
@@ -760,34 +715,6 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(EdgeRef e) 
 	
 	CheckEraseFace(f1, v0);
 	CheckEraseFace(f2, v1);
-	// if(e->on_boundary())
-	// {
-	// 	FaceRef fDelete = f1->boundary ? f2 : f1;
-	// 	HalfedgeRef targetH = f1->halfedge;
-	// 	if(fDelete->degree() < 3)
-	// 	{
-	// 		// which mean omly two edges to construct a triangle
-	// 		HalfedgeRef targetTwin = targetH->twin;
-	//  		HalfedgeRef targetNextTwin = targetH->next->twin;
-	// 		VertexRef v3 = targetH->next->vertex;
-	// 		EdgeRef eDelete = targetH->edge;
-	// 		// make two pairs into one pair
-	// 		targetNextTwin->twin = targetTwin;
-	// 		targetTwin->twin = targetNextTwin;
-	// 		// assign another edge
-	// 		targetTwin->edge = targetNextTwin->edge;
-	// 		targetNextTwin->edge->halfedge = targetTwin;
-	// 		// assign vertex with new halfedge
-	// 		v0->halfedge = v0->halfedge->next->twin;
-	// 		v3->halfedge = targetTwin;
-
-	// 		// erase 
-	// 		erase_halfedge(targetH->next);
-	// 		erase_halfedge(targetH);
-	// 		erase_edge(eDelete);
-	// 		erase_face(fDelete);
-	// 	}
-	// }
 
 	// Last Step erase h\t\e
 	erase_edge(e);
@@ -884,6 +811,7 @@ void Halfedge_Mesh::bevel_positions(FaceRef face, std::vector<Vec3> const &start
  */
 void Halfedge_Mesh::extrude_positions(FaceRef face, Vec3 move, float shrink) {
 	//A2L4h: Extrude Positions Helper
+	// clamp
 	shrink = shrink > 1.0f ? 1.0f : shrink;
 	// Collect all vertices
 	std::vector<VertexRef> faceVertices;

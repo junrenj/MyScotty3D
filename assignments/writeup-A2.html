@@ -1,6 +1,6 @@
 **Assignment 2 Report**
 
-AndrewID: XXXX
+AndrewID: junrenj
 
 (##) About this template
 
@@ -20,7 +20,7 @@ You do not need any screenshots for this task.
 
 **What edge cases did you handle?**
 
-*  Answer here:
+*  Answer here: Invalid cases I haved handled : 1. Edge is a boundary edge. 2. The next vertices(v3 and v4) of two halfedges of edge has been connected to each other. 3. One or both two vertices(v1&v2) of edge are only connected to two edges. 4. The faces where h and t are not located on the same plane. 
 
 Your completion will be graded based on the reference `test.a2.l1.cpp` file and 
 checking that the operation works in the GUI.
@@ -31,7 +31,7 @@ You do not need any screenshots for this task.
 
 **What edge cases did you handle?**
 
-*  Answer here:
+*  Answer here: I write a function to connect new halfedges with v3 or v4 based on whether f1 or f2 is a boundary face.
 
 Your completion will be graded based on the reference `test.a2.l2.cpp` file and 
 checking that the operation works in the GUI.
@@ -42,7 +42,7 @@ You do not need any screenshots for this task.
 
 **What edge cases did you handle?**
 
-*  Answer here:
+*  Answer here: Invalid egde cases I handle : Single triangle. Valid special case : I write a function to erase the rest of the faces(f1 and f2) based on the degree of that face. So after collapsion if there is a face only has less than 3 degrees. It and its halfedges and edge will be erased.
 
 Your completion will be graded based on the reference `test.a2.l3.cpp` file and 
 checking that the operation works in the GUI.
@@ -53,7 +53,7 @@ You do not need any screenshots for this task.
 
 **What edge cases did you handle?**
 
-*  Answer here:
+*  Answer here: Invalid case I handle: The face is a boundary face.
 
 Your completion will be graded based on the reference `test.a2.l4.cpp` file and 
 checking that the operation works in the GUI.

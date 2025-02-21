@@ -291,3 +291,40 @@ if (mesh.flip_edge(edge)) {
     }
 });
 
+/*
+EDGE CASE
+
+NOTICE:two faces are not at the same plane
+
+Initial mesh:
+0--1--2
+|  |  |
+|  |  |
+|  |  |
+3--4--5
+
+Flip Edge on Edge: 1-4
+
+After mesh:
+0--1--2
+|  |  |
+|  |  |
+|  |  |
+3--4--5
+*/
+Test test_a2_l1_flip_edge_surfaces_on_the_same_plane("a2.l1.flip_edge.surfaces_on_the_same_plane", []() {
+    Halfedge_Mesh mesh = Halfedge_Mesh::from_indexed_faces({
+        Vec3(-1.0f, 1.0f, -0.5f), Vec3(0.0f, 1.0f, 0.0f), Vec3(1.0f, 1.0f, -0.5f),
+                        
+        Vec3(-1.0f,-1.0f, -0.5f), Vec3(0.0f, -1.0f, 0.0f), Vec3(1.0f, -1.0f, -0.5f)
+    }, {
+        {0, 3, 4, 1}, 
+        {1, 4, 5, 2}
+    });
+    Halfedge_Mesh::EdgeRef edge = mesh.halfedges.begin()->next->next->edge;
+
+if (mesh.flip_edge(edge)) {
+        throw Test::error("flip_edge should not work when faces where h and t are located are not on the same plane.");
+    }
+});
+
