@@ -710,6 +710,10 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(EdgeRef e) 
 	{
 		toT = toT->next;
 	} while (toT-> next != t);
+	
+	// Special case : single triangle
+	if(h->next->twin == toT && t->next->twin == toH)
+		return std::nullopt;
 
 	
 	// method combine h->vertex which mean we have to reconnect t->vertex side data
