@@ -15,6 +15,7 @@ static void expect_collapse(Halfedge_Mesh &mesh, Halfedge_Mesh::EdgeRef edge, Ha
 	}
 }
 
+
 /*
 BASIC CASE
 
@@ -420,4 +421,30 @@ Test test_a2_l3_collapse_pentagon_boundary("a2.l3.collapse_edge.pentagon.boundar
         {1, 2, 3}
     }); 
     expect_collapse(pentagon, edge, doubletriangle);
+});
+
+
+/*
+0
+| \
+|  1
+| / 
+2 
+
+collapse 0 - 2
+*/
+
+Test test_a2_l3_collapse_edge_single_triangle("a2.l3.collapse.edge.single.triangle", []() {
+    Halfedge_Mesh mesh = Halfedge_Mesh::from_indexed_faces({
+        Vec3(-1.0f, 1.0f, 0.0f),
+                        Vec3(0.0f, 0.0f, 0.0f),
+        Vec3(-1.0f,-1.0f, 0.0f)
+    }, {
+        {0, 2, 1}
+    });
+    Halfedge_Mesh::EdgeRef edge = mesh.halfedges.begin()->edge;
+
+if (mesh.collapse_edge(edge)) {
+        throw Test::error("collapse_edge should not work at a single triangle.");
+    }
 });
