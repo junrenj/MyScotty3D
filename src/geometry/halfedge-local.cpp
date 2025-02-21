@@ -573,21 +573,6 @@ std::optional<Halfedge_Mesh::EdgeRef> Halfedge_Mesh::flip_edge(EdgeRef e) {
 		// update loop
 		v1->halfedge->next = t;
 		v2->halfedge->next = h;
-
-		HalfedgeRef h1 = h;
-		do
-		{
-			h1->face = h->face;
-			h1 = h1->next;
-		} while (h1 != h);
-		h1 = t;
-		do
-		{
-			h1->face = t->face;
-			h1 = h1->next;
-		} while (h1 != t);
-		
-
 		return e;
 	}
 }
@@ -667,6 +652,10 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(EdgeRef e) 
 
 	// Special case : single triangle
 	if(h->next->twin == toT && t->next->twin == toH)
+		return std::nullopt;
+	
+	// Special case : non manifold
+	if(h->next->twin->face->boundary && t->next->twin->face->boundary && toT->twin->face->boundary && toH->twin->face->boundary)
 		return std::nullopt;
 
 	

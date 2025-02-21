@@ -548,6 +548,44 @@ Test test_a2_l3_collapse_adj_triangles("a2.l3.collapse_edge.adj.triangles", []()
     expect_collapse(square, edge, after);
 });
 
+//Test case from Anonymous Atom
+/*
+
+0---1---2
+|   |   |
+|   |   |
+3---4---5
+
+collapse 1-4
+
+*/
+
+Test test_a2_l3_collapse_nonmanifold("a2.l3.collapse_edge.nonmanifold", []() {
+
+    Halfedge_Mesh before = Halfedge_Mesh::from_indexed_faces({
+    
+    Vec3(0.0f, 1.0f, 0.0f), Vec3(0.5f, 1.0f, 0.0f), Vec3(1.0f, 1.0f, 0.0f),
+    
+    Vec3(0.0f, 0.0f, 0.0f), Vec3(0.5f, 0.0f, 0.0f), Vec3(1.0f, 0.0f, 0.0f)
+    
+    }, {
+    
+    {0, 1, 4, 3},
+    
+    {1, 2, 5, 4},
+    
+    });
+    
+    Halfedge_Mesh::EdgeRef edge = before.halfedges.begin()->next->edge;
+    
+    if (before.collapse_edge(edge)) {
+    
+    throw Test::error("collapse_edge should not work.");
+    
+    }
+    
+    });
+
 
 /*
 0
