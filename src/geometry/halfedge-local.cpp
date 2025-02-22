@@ -652,7 +652,7 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(EdgeRef e) 
 		return std::nullopt;
 	
 	// Special case : non manifold
-	if(h->next->twin->face->boundary && t->next->twin->face->boundary && toT->twin->face->boundary && toH->twin->face->boundary)
+	if(!e->on_boundary() && v0->on_boundary() && v1->on_boundary())
 		return std::nullopt;
 
 	
