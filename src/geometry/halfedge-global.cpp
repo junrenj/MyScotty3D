@@ -5,6 +5,13 @@
 
 #include <iostream>
 
+// for projected the vertex to 2D plane
+enum TargetCoordinate
+{
+	XY,
+	YZ,
+	ZX
+};
 
 /*
  * triangulate: split all non-boundary faces into triangles.
@@ -13,6 +20,174 @@
  */
 void Halfedge_Mesh::triangulate() {
 	//A2G1: triangulation
+	auto Vec3ToVec2 = [&](Vec3 pos, TargetCoordinate tagCoordinate)->Vec2
+	{
+		switch (tagCoordinate)
+		{
+			case XY:
+				return Vec2(pos.x, pos.y);
+			case YZ:
+				return Vec2(pos.y, pos.z);
+			case ZX:
+				return Vec2(pos.z, pos.x);
+			default:
+				return Vec2(pos.x, pos.y);
+		}
+	};
+
+	auto ConvexFunc = [&](Vec2 pre, Vec2 next, Vec2 t)->bool
+	{
+		// result < 0 -> convex
+		float result = (t.x - pre.x)*(next.y - t.y) - (next.x - t.x)*(pre.y - t.y);
+		return result < 0;
+	};
+
+	auto isInTriangle = [](Vec2 p, Vec2 a, Vec2 b, Vec2 c)->bool
+	{
+		// Barycentric Edge function
+		float alpha = (c.x - b.x)*(p.y - b.y) - (p.x - b.x)*(c.y - b.y);
+		float beta = (a.x - c.x)*(p.y - c.y) - (p.x - c.x)*(a.y - c.y);
+		float gamma =(b.x - a.x)*(p.y - a.y) - (p.x - a.x)*(b.y - a.y);
+
+		return (alpha > 0 && beta > 0 && gamma > 0) || (alpha < 0 && beta < 0 && gamma < 0);
+	};
+	
+	auto DeleteEar = [&](FaceRef oldFace, HalfedgeRef h_Ear, HalfedgeRef h_Ear_pre, HalfedgeRef h_Ear_pre_pre)
+	{
+		// Counter Clockwise
+		FaceRef f_new = emplace_face();
+		HalfedgeRef h = emplace_halfedge();
+		HalfedgeRef t = emplace_halfedge();
+		EdgeRef e = emplace_edge();
+		e->halfedge = h;
+		h->edge = e;
+		t->edge = e;
+		f_new->halfedge = h;
+		h->twin = t;
+		t->twin = h;
+		h->face = f_new;
+		t->face = oldFace;
+		oldFace->halfedge = t;
+
+		// Assign vertex
+		h->vertex = h_Ear->next->vertex;
+		t->vertex = h_Ear_pre->vertex;
+		// Connect
+		t->next = h_Ear->next;
+		h_Ear->next = h;
+		h->next = h_Ear_pre;
+		h_Ear_pre_pre->next = t;
+
+		// Assign New Face
+		HalfedgeRef startH = h;
+		do
+		{
+			startH->face = f_new;
+			startH = startH->next;
+		} while (startH != h);
+	};
+
+	auto isEar = [&](std::vector<HalfedgeRef>::iterator it, TargetCoordinate tc, std::vector<HalfedgeRef>& halfedgesLoop)->bool
+	{
+		auto it_pre = (it == halfedgesLoop.begin()) ? std::prev(halfedgesLoop.end()) : it - 1;
+		auto it_next = (std::next(it) == halfedgesLoop.end()) ? halfedgesLoop.begin() : std::next(it);
+		VertexRef pre = (*it_pre)->vertex;
+		VertexRef next = (*it_next)->vertex;
+		
+		VertexRef t = (*it)->vertex;
+		Vec2 pre_Pos = Vec3ToVec2(pre->position, tc);
+		Vec2 next_Pos = Vec3ToVec2	(next->position, tc);
+		Vec2 t_Pos = Vec3ToVec2(t->position, tc);
+
+		if (ConvexFunc(pre_Pos, next_Pos, t_Pos))
+		{
+			for (auto itX = halfedgesLoop.begin(); itX != halfedgesLoop.end(); ++itX)
+			{
+				VertexRef v_p = (*itX)->vertex;
+				if (isInTriangle(Vec3ToVec2(v_p->position, tc), pre_Pos, next_Pos, t_Pos))
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+		return false;
+	};
+
+	auto EarClipping = [&](FaceRef f)
+	{
+		HalfedgeRef h = f->halfedge;
+		std::vector<HalfedgeRef> halfedgesLoop;
+
+		// 1. get all halfedges
+		HalfedgeRef startH = h;
+		do
+		{
+			halfedgesLoop.emplace_back(startH);
+			startH = startH->next;
+		} while (startH != h);
+
+		if (halfedgesLoop.size() == 3)
+			return;
+
+		// 2. decide which plane to project
+		Vec3 normal = f->normal();
+		TargetCoordinate tc = (std::abs(normal.x) >= std::abs(normal.y) && std::abs(normal.x) >= std::abs(normal.z)) ? YZ :
+							(std::abs(normal.y) >= std::abs(normal.x) && std::abs(normal.y) >= std::abs(normal.z)) ? ZX : XY;
+
+		// 3. find all ears
+		std::vector<std::vector<HalfedgeRef>::iterator> iterators_Ear;
+		for (auto it = halfedgesLoop.begin(); it != halfedgesLoop.end(); ++it)
+		{
+			if (isEar(it, tc, halfedgesLoop))
+				iterators_Ear.emplace_back(it);
+		}
+		// 4. delete ears
+		while (halfedgesLoop.size() > 3)
+		{
+			auto i_ear = iterators_Ear.begin();
+			auto it = *i_ear;
+			auto it_pre = (it == halfedgesLoop.begin()) ? halfedgesLoop.end() - 1 : it - 1;
+			auto it_next = (std::next(it) == halfedgesLoop.end()) ? halfedgesLoop.begin() : std::next(it);
+
+			HalfedgeRef targetH = *it;
+			HalfedgeRef targetH_pre = *it_pre;
+			HalfedgeRef targetH_pre_pre = (it_pre == halfedgesLoop.begin()) ? *(halfedgesLoop.end() - 1) : *(it_pre - 1);
+
+			DeleteEar(f, targetH, targetH_pre, targetH_pre_pre);
+
+			halfedgesLoop.erase(it);
+			iterators_Ear.erase(i_ear);
+			if(halfedgesLoop.size() > 3)
+			{
+				// 4.2 check nearby two vertices
+				if (isEar(it_pre, tc, halfedgesLoop))
+					iterators_Ear.emplace_back(it_pre);
+				if (isEar(it_next, tc, halfedgesLoop))
+					iterators_Ear.emplace_back(it_next);
+			}
+		}
+	};
+
+	for (FaceRef f = faces.begin(); f != faces.end(); ++f)
+	{
+		if(f->boundary)
+			continue;
+		
+		// Caculate the total number of vertex
+		HalfedgeRef h = f->halfedge;
+		int num = 0;
+		HalfedgeRef startH = h;
+		do
+		{
+			startH = startH->next;
+			num++;
+		}while(startH != h);
+		if(num == 3)
+			continue;
+		
+		EarClipping(f);
+	}
 	
 }
 
