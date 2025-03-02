@@ -20,7 +20,7 @@ enum TargetCoordinate
  */
 void Halfedge_Mesh::triangulate() {
 	//A2G1: triangulation
-	auto Vec3ToVec2 = [&](Vec3 pos, TargetCoordinate tagCoordinate)->Vec2
+	auto Vec3ToVec2 = [](Vec3 pos, TargetCoordinate tagCoordinate)->Vec2
 	{
 		switch (tagCoordinate)
 		{
@@ -35,11 +35,11 @@ void Halfedge_Mesh::triangulate() {
 		}
 	};
 
-	auto ConvexFunc = [&](Vec2 pre, Vec2 next, Vec2 t)->bool
+	auto ConvexFunc = [](Vec2 pre, Vec2 next, Vec2 t, bool isCounterwise)->bool
 	{
-		// result < 0 -> convex
-		float result = (t.x - pre.x)*(next.y - t.y) - (next.x - t.x)*(pre.y - t.y);
-		return result < 0;
+		// result > 0 -> convex
+		float result = (t.x - pre.x)*(next.y - t.y) - (next.x - t.x)*(t.y - pre.y);
+		return (isCounterwise ? (result > 0) : (result < 0));
 	};
 
 	auto isInTriangle = [](Vec2 p, Vec2 a, Vec2 b, Vec2 c)->bool
@@ -87,7 +87,7 @@ void Halfedge_Mesh::triangulate() {
 		} while (startH != h);
 	};
 
-	auto isEar = [&](std::vector<HalfedgeRef>::iterator it, TargetCoordinate tc, std::vector<HalfedgeRef>& halfedgesLoop)->bool
+	auto isEar = [&](std::vector<HalfedgeRef>::iterator it, TargetCoordinate tc, std::vector<HalfedgeRef>& halfedgesLoop, bool isCounterwise)->bool
 	{
 		auto it_pre = (it == halfedgesLoop.begin()) ? std::prev(halfedgesLoop.end()) : it - 1;
 		auto it_next = (std::next(it) == halfedgesLoop.end()) ? halfedgesLoop.begin() : std::next(it);
@@ -99,7 +99,7 @@ void Halfedge_Mesh::triangulate() {
 		Vec2 next_Pos = Vec3ToVec2	(next->position, tc);
 		Vec2 t_Pos = Vec3ToVec2(t->position, tc);
 
-		if (ConvexFunc(pre_Pos, next_Pos, t_Pos))
+		if (ConvexFunc(pre_Pos, next_Pos, t_Pos, isCounterwise))
 		{
 			for (auto itX = halfedgesLoop.begin(); itX != halfedgesLoop.end(); ++itX)
 			{
@@ -132,14 +132,29 @@ void Halfedge_Mesh::triangulate() {
 
 		// 2. decide which plane to project
 		Vec3 normal = f->normal();
-		TargetCoordinate tc = (std::abs(normal.x) >= std::abs(normal.y) && std::abs(normal.x) >= std::abs(normal.z)) ? YZ :
-							(std::abs(normal.y) >= std::abs(normal.x) && std::abs(normal.y) >= std::abs(normal.z)) ? ZX : XY;
+		float nX = abs(normal.x);
+		float nY = abs(normal.y);
+		float nZ = abs(normal.z);
+		bool isCounterwise = true;
+		TargetCoordinate tc = XY;
+		if(nX >= nY && nX >= nZ)
+		{
+			tc = YZ;
+			isCounterwise = normal.x > 0;
+		}
+		else if(nY >= nZ && nY >= nX)
+		{
+			tc = ZX;
+			isCounterwise = normal.y > 0;
+		}
+		else
+			isCounterwise = normal.z > 0;
 
 		// 3. find all ears
 		std::vector<std::vector<HalfedgeRef>::iterator> iterators_Ear;
 		for (auto it = halfedgesLoop.begin(); it != halfedgesLoop.end(); ++it)
 		{
-			if (isEar(it, tc, halfedgesLoop))
+			if (isEar(it, tc, halfedgesLoop, isCounterwise))
 				iterators_Ear.emplace_back(it);
 		}
 		// 4. delete ears
@@ -161,9 +176,9 @@ void Halfedge_Mesh::triangulate() {
 			if(halfedgesLoop.size() > 3)
 			{
 				// 4.2 check nearby two vertices
-				if (isEar(it_pre, tc, halfedgesLoop))
+				if (isEar(it_pre, tc, halfedgesLoop, isCounterwise))
 					iterators_Ear.emplace_back(it_pre);
-				if (isEar(it_next, tc, halfedgesLoop))
+				if (isEar(it_next, tc, halfedgesLoop, isCounterwise))
 					iterators_Ear.emplace_back(it_next);
 			}
 		}
@@ -188,7 +203,6 @@ void Halfedge_Mesh::triangulate() {
 		
 		EarClipping(f);
 	}
-	
 }
 
 /*
@@ -206,19 +220,33 @@ void Halfedge_Mesh::linear_subdivide() {
 	//A2G2: linear subdivision
 
 	// For every vertex, assign its current position to vertex_positions[v]:
+	for (VertexCRef v = vertices.begin(); v != vertices.end(); v++)
+	{
+		vertex_positions.insert({v, v->position});
+	}
 
 	//(TODO)
 
     // For every edge, assign the midpoint of its adjacent vertices to edge_vertex_positions[e]:
 	// (you may wish to investigate the helper functions of Halfedge_Mesh::Edge)
+	for (EdgeCRef e = edges.begin(); e != edges.end(); e++)
+	{
+		edge_vertex_positions.insert({e, e->center()}) ;
+	}
+	
 
 	//(TODO)
 
     // For every *non-boundary* face, assign the centroid (i.e., arithmetic mean) to face_vertex_positions[f]:
 	// (you may wish to investigate the helper functions of Halfedge_Mesh::Face)
+	for (FaceCRef f = faces.begin(); f != faces.end(); f++)
+	{
+		if(!f->boundary)
+			face_vertex_positions.insert({f, f->center()});
+	}
 
 	//(TODO)
-
+	
 
 	//use the helper function to actually perform the subdivision:
 	catmark_subdivide_helper(vertex_positions, edge_vertex_positions, face_vertex_positions);
@@ -247,11 +275,63 @@ void Halfedge_Mesh::catmark_subdivide() {
 	// https://en.wikipedia.org/wiki/Catmull%E2%80%93Clark_subdivision_surface
 
 	// Faces
-
+	for (FaceCRef f = faces.begin(); f != faces.end(); f++)
+	{
+		if(!f->boundary)
+			face_vertex_positions.insert({f, f->center()});
+	}
 	// Edges
-
+	for (EdgeCRef e = edges.begin(); e != edges.end(); e++)
+	{
+		Vec3 edgePos;
+		edgePos = e->center();
+		if(!e->on_boundary())
+			edgePos = (edgePos * 2 + e->halfedge->face->center() + e->halfedge->twin->face->center()) / 4; 
+		edge_vertex_positions.insert({e, edgePos});
+	}
 	// Vertices
+	for (VertexCRef v = vertices.begin(); v != vertices.end(); v++)
+	{
+		Vec3 S = v->position;
+		Vec3 v_Pos;
+		HalfedgeRef h = v->halfedge;
+		// n: vertex degree
+		float n = static_cast<float>(v->degree());
+		if(v->on_boundary())
+		{
+			Vec3 v_next = h->twin->vertex->position;
+			HalfedgeRef toH = h;
+			do
+			{
+				toH = toH->next;
+			} while (toH->next != h);
+			Vec3 v_pre = toH->vertex->position;
+			v_Pos = (v_pre + v_next) / 8.0f + S * 0.75f;
+		}
+		else
+		{
+			// Q: average of face coords around vertex
+			// R: average of edge coords around vertex
+			HalfedgeRef startH = h;
+			Vec3 Q;
+			Vec3 R;
+			int count = 0;
+			do
+			{
+				Q += startH->face->center();
+				R += startH->edge->center();
+				count ++;
+				startH= startH->twin->next;
+			} while (startH != h);
+			Q /= (float)count;
+			R /= (float)count;
 
+			v_Pos = (Q + 2*R + (n-3)* S) / n;
+
+		}
+		vertex_positions.insert({v, v_Pos});
+	}
+	
 	
 	//Now, use the provided helper function to actually perform the subdivision:
 	catmark_subdivide_helper(vertex_positions, edge_vertex_positions, face_vertex_positions);
@@ -271,11 +351,11 @@ void Halfedge_Mesh::catmark_subdivide() {
  * Do note that this requires a working implementation of edge split and edge flip
  */
 bool Halfedge_Mesh::loop_subdivide() {
-
 	//preamble: check for any non-triangular non-boundary faces:
 	for (FaceCRef f = faces.begin(); f != faces.end(); ++f) {
 		if (f->boundary) continue; //ignore boundary faces for this check
-		if (f->halfedge->next->next->next != f->halfedge) {
+		if (f->halfedge->next->next->next != f->halfedge) 
+		{
 			//found a non-triangular face!
 			return false;
 		}
@@ -299,12 +379,69 @@ bool Halfedge_Mesh::loop_subdivide() {
 	// the Loop subdivision rule and store them in vertex_new_pos.
 	[[maybe_unused]]
 	std::unordered_map< VertexRef, Vec3 > vertex_new_pos;
+	for (VertexRef v = vertices.begin(); v != vertices.end(); v++)
+	{
+		HalfedgeRef h = v->halfedge;
+		int num = 0;
+		Vec3 v_old = v->position;
+		Vec3 v_new;
+		Vec3 neighbor;
+		bool isBoundaryVertex = false;
+		do
+		{
+			if(h->edge->on_boundary())
+				isBoundaryVertex = true;
+			neighbor += h->twin->vertex->position;
+			h = h->twin->next;
+			num++;
+		} while (h != v->halfedge);
+
+		if(isBoundaryVertex)
+		{
+			neighbor = Vec3(0.0f, 0.0f, 0.0f);
+			HalfedgeRef h1 = h;
+			do
+			{
+				if(h1->edge->on_boundary())
+					neighbor += h1->twin->vertex->position;
+				h1 = h1->twin->next;
+			} while (h1 != h);
+			
+			v_new = 0.125f * neighbor + 0.75f * v_old;
+		}
+		else
+		{
+			if(num == 3)
+				v_new = (1.0f - (float)num * 3.0f / 16.0f) * v_old + 3.0f / 16.0f * neighbor;
+			else
+				v_new = 5.0f / 8.0f * v_old + 3.0f / (8.0f * (float)num) * neighbor;
+
+		}
+
+		vertex_new_pos.insert({v, v_new});
+	}
 	    
 	// Next, compute the subdivided vertex positions associated with edges, and
 	// store them in edge_new_pos:
 	[[maybe_unused]]
 	std::unordered_map< EdgeRef, Vec3 > edge_new_pos;
-    
+    for (EdgeRef e = edges.begin(); e != edges.end(); e++)
+	{
+		Vec3 newV;
+		Vec3 A = e->halfedge->vertex->position;
+		Vec3 B = e->halfedge->twin->vertex->position;
+		if(e->on_boundary())
+		{
+			newV = (A + B) / 2.0f;
+		}
+		else
+		{
+			Vec3 C = e->halfedge->next->next->vertex->position;
+			Vec3 D = e->halfedge->twin->next->next->vertex->position;
+			newV = 0.375f * (A + B) + 0.125f * (C + D);
+		}
+		edge_new_pos.insert({e, newV});
+	}
 	// Next, we're going to split every edge in the mesh, in any order, placing
 	// the split vertex at the recorded edge_new_pos.
 	//
@@ -312,6 +449,24 @@ bool Halfedge_Mesh::loop_subdivide() {
 	// edges added by splitting. So store references to the new edges:
 	[[maybe_unused]]
 	std::vector< EdgeRef > new_edges;
+	std::vector<EdgeRef> originalEdges;
+	for (EdgeRef e = edges.begin(); e != edges.end(); ++e) 
+	{
+		originalEdges.push_back(e);
+	}
+	
+	for (EdgeRef e : originalEdges)
+	{
+		VertexRef newV = *split_edge(e);
+		if (edge_new_pos.count(e)) 
+		{
+			newV->position = edge_new_pos[e];
+		}
+		if(!newV->on_boundary())
+			new_edges.emplace_back(newV->halfedge->twin->next->edge);
+
+		new_edges.emplace_back(newV->halfedge->next->next->edge);
+	}
 
 	// Also note that in this loop, we only want to iterate over edges of the
 	// original mesh. Otherwise, we'll end up splitting edges that we just split
@@ -326,12 +481,22 @@ bool Halfedge_Mesh::loop_subdivide() {
 	};
 
     // Now flip any new edge that connects an old and new vertex.
+	for (size_t i = 0; i < new_edges.size(); i++)
+	{
+		VertexRef v0 = new_edges[i]->halfedge->vertex;
+		VertexRef v1 = new_edges[i]->halfedge->twin->vertex;
+
+		if(!is_new(v0) && is_new(v1))
+			flip_edge(new_edges[i]);
+	}
     
     // Finally, copy new vertex positions into the Vertex::position.
-
-
-
-
+	for (VertexRef v = vertices.begin(); v != vertices.end(); v++)
+	{
+		auto it = vertex_new_pos.find(v);
+		if(it!= vertex_new_pos.end())
+			v->position = it->second;
+	}
 	return true;
 }
 

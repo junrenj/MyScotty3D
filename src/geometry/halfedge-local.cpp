@@ -516,6 +516,17 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::extrude_face(FaceRef f) {
  */
 std::optional<Halfedge_Mesh::EdgeRef> Halfedge_Mesh::flip_edge(EdgeRef e) {
 	//A2L1: Flip Edge
+	auto AssignFace = [&](HalfedgeRef h, FaceRef f)
+	{
+		HalfedgeRef startH = h;
+		f->halfedge = h;
+		do
+		{
+			startH->face = f;
+			startH = startH->next;
+		} while (startH != h);
+	};
+
 	// Boundry edge
 	if(e->on_boundary())
     	return std::nullopt;
@@ -525,8 +536,8 @@ std::optional<Halfedge_Mesh::EdgeRef> Halfedge_Mesh::flip_edge(EdgeRef e) {
 		// Collect data
 		HalfedgeRef h = e->halfedge;
 		HalfedgeRef t = h->twin;
-		VertexRef v1 = h->next->vertex;
-		VertexRef v2 = t->next->vertex;
+		VertexRef v1 = h->vertex;
+		VertexRef v2 = t->vertex;
 		VertexRef v3 = h->next->next->vertex;
 		VertexRef v4 = t->next->next->vertex;
 		FaceRef f1 = h->face;
@@ -540,36 +551,36 @@ std::optional<Halfedge_Mesh::EdgeRef> Halfedge_Mesh::flip_edge(EdgeRef e) {
 		do
 		{
 			toH = toH->next;
-		}while(toH->next != h);do
+		}while(toH->next != h);
+		do
 		{
 			toT = toT->next;
 		}while(toT->next != t);
 		// special case 2: v1/v2 only connect to two edges
-		if(toH->twin == t->next || toT->twin == h->next)
+		if(v1->degree() <= 2 || v2->degree() <= 2)
 			return std::nullopt;
 		
 		// halfedge->next == h || t
 		toH->next = t->next;		// instead of point to h, replace it with t->next
 		toT->next = h->next;		// instead of point to t, replace it with h->next
+		HalfedgeRef t_next = t->next;
+		HalfedgeRef h_next = h->next;
 
 		// disconnect
-		v1->halfedge = h->next;
-		v2->halfedge = t->next;
-		f1->halfedge = h;
-		f2->halfedge = t;
+		v1->halfedge = t->next;
+		v2->halfedge = h->next;
 
 		// connect
 		t->vertex = v3;
 		h->vertex = v4;
-		h->next = v3->halfedge;
-		t->next = v4->halfedge;
+		h->next = h->next->next;
+		t->next = t->next->next;
+		h_next->next = t;
+		t_next->next = h;
 
 		// update face
-		v1->halfedge->face = t->face;
-		v2->halfedge->face = h->face;
-		// update loop
-		v1->halfedge->next = t;
-		v2->halfedge->next = h;
+		AssignFace(h, f1);
+		AssignFace(t, f2);
 		return e;
 	}
 }
