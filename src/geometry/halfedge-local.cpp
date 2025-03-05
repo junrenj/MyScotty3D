@@ -610,8 +610,91 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::make_boundary(FaceRef face)
  */
 std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::dissolve_vertex(VertexRef v) {
 	// A2Lx1 (OPTIONAL): Dissolve Vertex
+	std::vector<HalfedgeRef> v_OutH;
+	std::vector<HalfedgeRef> v_InT;
+	std::vector<FaceRef> v_faces;
+	HalfedgeRef startH = v->halfedge;
 
-    return std::nullopt;
+	auto AssignFace = [&](HalfedgeRef h, FaceRef f)
+	{
+		f->halfedge = h;
+		HalfedgeRef start = h;
+		do
+		{
+			if(!start->face->boundary)
+				start->face = f;
+			start = start->next;
+		} while (start != h);
+	};
+
+	//Collect data
+	do
+	{
+		v_OutH.emplace_back(startH);
+		v_InT.emplace_back(startH->twin);
+		v_faces.emplace_back(startH->face);
+		startH = startH->twin->next;
+	} while (startH != v->halfedge);
+
+	// Get ToT
+	std::vector<HalfedgeRef> v_InT_toT;
+	for (size_t i = 0; i < v_OutH.size(); i++)
+	{
+		HalfedgeRef toT = v_InT[i];
+		do
+		{
+			toT = toT->next;
+		} while (toT->next != v_InT[i]);
+		v_InT_toT.emplace_back(toT);
+	}
+	// Connect and Assign new halfedge to old vertices
+	bool isBorder = false;
+	HalfedgeRef borderInT = v_InT[0];
+	HalfedgeRef borderOutH_Twin_ToT = v_InT[0];
+	for (size_t i = 0; i < v_InT.size(); i++)
+	{
+		if(v_InT[i]->face->boundary)
+		{
+			v_InT[i]->next = v_InT[i]->next->next;
+			borderInT = v_InT[i];
+			isBorder = true;
+		}
+		else if(v_InT[i]->twin->face->boundary)
+		{
+			borderOutH_Twin_ToT = v_InT_toT[i];
+			isBorder = true;
+		}
+		else
+		{
+			v_InT[i]->vertex->halfedge = v_InT[i]->twin->next;
+			v_InT_toT[i]->next = v_OutH[i]->next;
+		}
+	}
+	if(isBorder)
+	{
+		borderInT->twin->vertex = borderOutH_Twin_ToT->next->vertex;
+		borderOutH_Twin_ToT->next->vertex->halfedge = borderInT->twin;
+		borderOutH_Twin_ToT->next = borderInT->twin;
+	}
+	//  Assign new face
+	AssignFace(v_InT_toT[0], v_faces[0]);
+	
+	// Erase
+	for (size_t i = 0; i < v_OutH.size(); i++)
+	{
+		if(!(v_InT[i]->face->boundary))
+		{
+			erase_edge(v_OutH[i]->edge);
+			erase_halfedge(v_OutH[i]->twin);
+			erase_halfedge(v_OutH[i]);
+		}
+	}
+	for (size_t i = 1; i < v_faces.size(); i++)
+	{
+		erase_face(v_faces[i]);
+	}
+	erase_vertex(v);
+	return v_faces[0];
 }
 
 /*

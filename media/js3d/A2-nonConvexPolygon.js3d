@@ -1,0 +1,54 @@
+{"scene":{
+	"FORMAT":"js3d-v1",
+	"transforms":{
+		"Transform":{
+			"parent":null,
+			"translation":[0,0,0],
+			"rotation":[0,0,0,1],
+			"scale":[1,1,1]
+		}
+	},
+	"cameras":{},
+	"meshes":{
+		"Mesh":{ "FORMAT":"s3d-hm-1","halfedge_nexts":"uint32:AgAAAAsAAAAEAAAAAQAAAAYAAAADAAAACAAAAAUAAAAKAAAABwAAAAAAAAAJAAAA","halfedge_corner_uvs":"vec2:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAgD8AAAAAAAAAAAAAgD8AAIA/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","halfedge_corner_normals":"vec3:AAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","bone_weight_bones":"uint32:","bone_weight_weights":"float:","vertex_halfedges":"uint32:CgAAAAIAAAAEAAAABgAAAAgAAAAAAAAA","vertex_positions":"vec3:8EKVvgAAADRKDye/R9uMvgAAAABv00Q/mn7SvgAAAACgYzO+QPVOvwAAAADxQv++jjUVPgAAgLSvN66/NsfLPgAA4DXwu/y+","vertex_bone_weight_ends":"uint32:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","edge_sharps":"bool:Ag","face_halfedges":"uint32:CgAAAAEAAAA","face_boundaries":"bool:YA"}
+	},
+	"skinned_meshes":{},
+	"shapes":{},
+	"particles":{},
+	"textures":{
+		"Texture":{
+			"type":"Constant",
+			"color":[0.75,0.75,0.75],
+			"scale":1
+		}
+	},
+	"materials":{
+		"Material":{
+			"type":"Lambertian",
+			"albedo":"Texture"
+		}
+	},
+	"delta_lights":{},
+	"env_lights":{},
+	"instances":{
+		"cameras":{},
+		"meshes":{
+			"Mesh Instance":{
+				"transform":"Transform",
+				"mesh":"Mesh",
+				"material":"Material",
+				"visible":true,
+				"collides":true,
+				"draw style":"Correct",
+				"blend style":"Blend Replace",
+				"depth style":"Depth Less"
+			}
+		},
+		"skinned_meshes":{},
+		"shapes":{},
+		"particles":{},
+		"delta_lights":{},
+		"env_lights":{}
+	}
+},"animator":{"FORMAT":"js3d-v1",
+"splines":{}}}

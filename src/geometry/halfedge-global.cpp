@@ -87,10 +87,10 @@ void Halfedge_Mesh::triangulate() {
 		} while (startH != h);
 	};
 
-	auto isEar = [&](std::vector<HalfedgeRef>::iterator it, TargetCoordinate tc, std::vector<HalfedgeRef>& halfedgesLoop, bool isCounterwise)->bool
-	{
-		auto it_pre = (it == halfedgesLoop.begin()) ? std::prev(halfedgesLoop.end()) : it - 1;
-		auto it_next = (std::next(it) == halfedgesLoop.end()) ? halfedgesLoop.begin() : std::next(it);
+	auto isEar = [&](std::vector<HalfedgeRef>::iterator it, TargetCoordinate tc, std::vector<HalfedgeRef>& hGroups, bool isCounterwise)->bool
+	{	
+		auto it_pre = (it == hGroups.begin()) ? std::prev(hGroups.end()) : it - 1;
+		auto it_next = (std::next(it) == hGroups.end()) ? hGroups.begin() : std::next(it);
 		VertexRef pre = (*it_pre)->vertex;
 		VertexRef next = (*it_next)->vertex;
 		
@@ -101,7 +101,7 @@ void Halfedge_Mesh::triangulate() {
 
 		if (ConvexFunc(pre_Pos, next_Pos, t_Pos, isCounterwise))
 		{
-			for (auto itX = halfedgesLoop.begin(); itX != halfedgesLoop.end(); ++itX)
+			for (auto itX = hGroups.begin(); itX != hGroups.end(); ++itX)
 			{
 				VertexRef v_p = (*itX)->vertex;
 				if (isInTriangle(Vec3ToVec2(v_p->position, tc), pre_Pos, next_Pos, t_Pos))
@@ -171,15 +171,31 @@ void Halfedge_Mesh::triangulate() {
 
 			DeleteEar(f, targetH, targetH_pre, targetH_pre_pre);
 
-			halfedgesLoop.erase(it);
-			iterators_Ear.erase(i_ear);
+			//halfedgesLoop.erase(it);
+			//iterators_Ear.erase(i_ear);
 			if(halfedgesLoop.size() > 3)
 			{
 				// 4.2 check nearby two vertices
-				if (isEar(it_pre, tc, halfedgesLoop, isCounterwise))
-					iterators_Ear.emplace_back(it_pre);
-				if (isEar(it_next, tc, halfedgesLoop, isCounterwise))
-					iterators_Ear.emplace_back(it_next);
+				// if (isEar(it_pre, tc, halfedgesLoop, isCounterwise))
+				// 	iterators_Ear.emplace_back(it_pre);
+				// if (isEar(it_next, tc, halfedgesLoop, isCounterwise))
+				// 	iterators_Ear.emplace_back(it_next);
+
+				// Because of my poor C++, I have to refresh all every time. 
+				// The commented code above has bugs to fix which will lead to read the invalid iterator.
+				halfedgesLoop.clear();
+				iterators_Ear.clear();
+				HalfedgeRef refreshH = f->halfedge;
+				do
+				{
+					halfedgesLoop.emplace_back(refreshH);
+					refreshH = refreshH->next;
+				} while (refreshH != f->halfedge);
+				for (auto itss = halfedgesLoop.begin(); itss != halfedgesLoop.end(); ++itss)
+				{
+					if (isEar(itss, tc, halfedgesLoop, isCounterwise))
+						iterators_Ear.emplace_back(itss);
+				}
 			}
 		}
 	};
