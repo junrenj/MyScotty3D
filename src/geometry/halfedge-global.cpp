@@ -163,7 +163,6 @@ void Halfedge_Mesh::triangulate() {
 			auto i_ear = iterators_Ear.begin();
 			auto it = *i_ear;
 			auto it_pre = (it == halfedgesLoop.begin()) ? halfedgesLoop.end() - 1 : it - 1;
-			auto it_next = (std::next(it) == halfedgesLoop.end()) ? halfedgesLoop.begin() : std::next(it);
 
 			HalfedgeRef targetH = *it;
 			HalfedgeRef targetH_pre = *it_pre;

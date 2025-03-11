@@ -400,9 +400,9 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::inset_vertex(FaceRef f) {
 	for (int i = 0; i < (int)newHs.size(); i++)
 	{
 		// Connect T with previous H
-		newTs[i]->next = newHs[(i - 1 < 0 ?  newHs.size() - 1 : i - 1)];
+		newTs[i]->next = newHs[(i - 1 < 0 ?  (int)newHs.size() - 1 : i - 1)];
 		// Connect T with old edge
-		oldHalfedge[i]->next = newTs[(i + 1) > newHs.size() - 1 ? 0 : i + 1];
+		oldHalfedge[i]->next = newTs[(i + 1) > (int)newHs.size() - 1 ? 0 : i + 1];
 	}
 	// Assign new face
 	for (size_t i = 0; i < newFaces.size(); i++)
@@ -688,7 +688,6 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::make_boundary(FaceRef face)
  */
 std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::dissolve_vertex(VertexRef v) {
 	// A2Lx1 (OPTIONAL): Dissolve Vertex
-	std::cout << describe() << std::endl;
 	std::vector<HalfedgeRef> v_OutH;
 	std::vector<HalfedgeRef> v_InT;
 	std::vector<FaceRef> v_faces;
@@ -751,7 +750,7 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::dissolve_vertex(VertexRef v
 	}
 	if(borderEdges > 0)
 	{
-		if(borderEdges >= v_OutH.size())
+		if(borderEdges >= (int)v_OutH.size())
 			return std::nullopt;
 		borderInT->twin->vertex = borderOutH_Twin_ToT->next->vertex;
 		borderOutH_Twin_ToT->next->vertex->halfedge = borderInT->twin;
