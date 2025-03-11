@@ -334,9 +334,87 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::split_edge(EdgeRef e) {
  */
 std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::inset_vertex(FaceRef f) {
 	// A2Lx4 (OPTIONAL): inset vertex
+	if(f->boundary)
+		return std::nullopt;
+
+	auto AssignFace = [&](FaceRef fx)
+	{
+		HalfedgeRef h1 = fx->halfedge;
+		do
+		{
+			h1 = h1->next;
+			h1->face = fx;
+		} while (h1 != fx->halfedge);
+		
+	};
+
+	std::vector<HalfedgeRef> newHs;
+	std::vector<HalfedgeRef> newTs;
+	std::vector<HalfedgeRef> oldHalfedge;
+	std::vector<FaceRef> newFaces;
+	std::vector<VertexCRef> oldVertices;
+
+	HalfedgeRef startH = f->halfedge;
+	VertexRef newV = emplace_vertex();
+	do
+	{
+		HalfedgeRef h = emplace_halfedge();
+		HalfedgeRef t = emplace_halfedge();
+		EdgeRef e = emplace_edge();
+		FaceRef f1 = emplace_face();
+
+		h->twin = t;
+		t->twin = h;
+		h->edge = e;
+		t->edge = e;
+		e->halfedge = h;
+		f1->halfedge = h;
+
+		// TODO: t->next should be last H
+		t->vertex = startH->vertex;
+
+		// TODO: h->previous should next T
+		h->vertex = newV;
+		h->face = f1;
+		h->next = startH;
+
+		newHs.emplace_back(h);
+		newTs.emplace_back(t);
+		oldHalfedge.emplace_back(startH);
+		newFaces.emplace_back(f1);
+		oldVertices.emplace_back(startH->vertex);
+
+		startH = startH->next;
+
+	} while (startH != f->halfedge);
+
+	newV->halfedge = newHs[0];
+	interpolate_data(oldVertices, newV);
+	for (size_t i = 0; i < oldVertices.size(); i++)
+	{
+		newV->position += (oldVertices[i]->position / (float)oldVertices.size());
+	}
 	
-	(void)f;
-    return std::nullopt;
+
+	// Connect
+	for (int i = 0; i < (int)newHs.size(); i++)
+	{
+		// Connect T with previous H
+		newTs[i]->next = newHs[(i - 1 < 0 ?  newHs.size() - 1 : i - 1)];
+		// Connect T with old edge
+		oldHalfedge[i]->next = newTs[(i + 1) > newHs.size() - 1 ? 0 : i + 1];
+	}
+	// Assign new face
+	for (size_t i = 0; i < newFaces.size(); i++)
+	{
+		AssignFace(newFaces[i]);
+	}
+	
+	// Delete old face
+	erase_face(f);
+
+	return newV;
+	
 }
 
 
@@ -366,7 +444,7 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::inset_vertex(FaceRef f) {
 /*
  * bevel_vertex: creates a face in place of a vertex
  *  v: the vertex to bevel
- *
+ *x1
  * returns: reference to the new face
  *
  * see also [BEVEL NOTE] above.
@@ -499,7 +577,7 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::extrude_face(FaceRef f) {
 	}
 
 	// Remember to also fill in extrude_helper (A2L4h)
-
+	//extrude_positions(f, Vec3(0.0f,0.0f,0.0f), 0.5f);
     return f;
 }
 
@@ -610,6 +688,7 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::make_boundary(FaceRef face)
  */
 std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::dissolve_vertex(VertexRef v) {
 	// A2Lx1 (OPTIONAL): Dissolve Vertex
+	std::cout << describe() << std::endl;
 	std::vector<HalfedgeRef> v_OutH;
 	std::vector<HalfedgeRef> v_InT;
 	std::vector<FaceRef> v_faces;
@@ -648,7 +727,7 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::dissolve_vertex(VertexRef v
 		v_InT_toT.emplace_back(toT);
 	}
 	// Connect and Assign new halfedge to old vertices
-	bool isBorder = false;
+	int borderEdges = 0;
 	HalfedgeRef borderInT = v_InT[0];
 	HalfedgeRef borderOutH_Twin_ToT = v_InT[0];
 	for (size_t i = 0; i < v_InT.size(); i++)
@@ -657,12 +736,12 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::dissolve_vertex(VertexRef v
 		{
 			v_InT[i]->next = v_InT[i]->next->next;
 			borderInT = v_InT[i];
-			isBorder = true;
+			borderEdges ++;
 		}
 		else if(v_InT[i]->twin->face->boundary)
 		{
 			borderOutH_Twin_ToT = v_InT_toT[i];
-			isBorder = true;
+			borderEdges ++;
 		}
 		else
 		{
@@ -670,8 +749,10 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::dissolve_vertex(VertexRef v
 			v_InT_toT[i]->next = v_OutH[i]->next;
 		}
 	}
-	if(isBorder)
+	if(borderEdges > 0)
 	{
+		if(borderEdges >= v_OutH.size())
+			return std::nullopt;
 		borderInT->twin->vertex = borderOutH_Twin_ToT->next->vertex;
 		borderOutH_Twin_ToT->next->vertex->halfedge = borderInT->twin;
 		borderOutH_Twin_ToT->next = borderInT->twin;
@@ -691,9 +772,11 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::dissolve_vertex(VertexRef v
 	}
 	for (size_t i = 1; i < v_faces.size(); i++)
 	{
-		erase_face(v_faces[i]);
+		if(!v_faces[i]->boundary)
+			erase_face(v_faces[i]);
 	}
 	erase_vertex(v);
+
 	return v_faces[0];
 }
 

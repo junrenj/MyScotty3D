@@ -302,7 +302,7 @@ void Halfedge_Mesh::catmark_subdivide() {
 		Vec3 edgePos;
 		edgePos = e->center();
 		if(!e->on_boundary())
-			edgePos = (edgePos * 2 + e->halfedge->face->center() + e->halfedge->twin->face->center()) / 4; 
+			edgePos = (edgePos * 2.0f + e->halfedge->face->center() + e->halfedge->twin->face->center()) / 4.0f; 
 		edge_vertex_positions.insert({e, edgePos});
 	}
 	// Vertices
@@ -315,6 +315,8 @@ void Halfedge_Mesh::catmark_subdivide() {
 		float n = static_cast<float>(v->degree());
 		if(v->on_boundary())
 		{
+			if(!h->face->boundary)
+				h = h->twin;
 			Vec3 v_next = h->twin->vertex->position;
 			HalfedgeRef toH = h;
 			do
@@ -322,7 +324,7 @@ void Halfedge_Mesh::catmark_subdivide() {
 				toH = toH->next;
 			} while (toH->next != h);
 			Vec3 v_pre = toH->vertex->position;
-			v_Pos = (v_pre + v_next) / 8.0f + S * 0.75f;
+			v_Pos = v_pre* 0.125f + v_next * 0.125f + S * 0.75f;
 		}
 		else
 		{
@@ -342,7 +344,7 @@ void Halfedge_Mesh::catmark_subdivide() {
 			Q /= (float)count;
 			R /= (float)count;
 
-			v_Pos = (Q + 2*R + (n-3)* S) / n;
+			v_Pos = (Q + 2.0f*R + (n-3)* S) / n;
 
 		}
 		vertex_positions.insert({v, v_Pos});

@@ -65,6 +65,8 @@ You do not need any screenshots for this task.
 Your completion will be graded based on the reference `test.a2.g1.cpp` file and 
 checking that the operation works in the GUI.
 
+Extra credit: I implement earclipping method to triangulate the non-convex polygon. To test it, you can use media/js3d/A2-nonConvexPolygon.js3d.
+
 (##) A2G2 FINAL
 
 You do not need any screenshots for this task. 
@@ -92,9 +94,10 @@ checking that the operation works in the GUI.
 
 Image of model in the GUI:
 <div class="twentytwenty-container">
-    <img src="A2-writeup/reference/model-image.png" alt="Your creation">
+    <img src="A2-writeup/reference/model.png" alt="Your creation">
 </div>
-Explanation of what it is and how you made it:
+Explanation of what it is and how you made it: It is a warm wooden house in a forest.
+I use bevel and extrude face function to create trees. And I use inset vertices function to create camp. For fire plane, I use split edge and dissolve vertices function to create polygon mesh. In terms of rocks, I created them by using catmull on a cube, same logic for smoke.
 
 Any free model sources you need to credit?
 
@@ -104,7 +107,7 @@ You do not need any screenshots for this task.
 
 **What edge cases did you handle?**
 
-*  Answer here:
+*  Answer here: I handle the non-boundary vertex case.
 
 Your completion will be graded based on the reference `test.a2.lx1.cpp` file and 
 checking that the operation works in the GUI.
@@ -137,7 +140,7 @@ You do not need any screenshots for this task.
 
 **What edge cases did you handle?**
 
-*  Answer here:
+*  Answer here: Invalid case: face is a boundary face. And other case is valid.
 
 Your completion will be graded based on the reference `test.a2.lx4.cpp` file and 
 checking that the operation works in the GUI.
