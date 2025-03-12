@@ -314,8 +314,16 @@ void Halfedge_Mesh::catmark_subdivide() {
 		float n = static_cast<float>(v->degree());
 		if(v->on_boundary())
 		{
-			if(!h->face->boundary)
-				h = h->twin;
+			do
+			{
+				if(h->face->boundary)
+				{
+					break;
+				}
+				else
+					h = h->twin->next;
+			} while (h != v->halfedge);
+			
 			Vec3 v_next = h->twin->vertex->position;
 			HalfedgeRef toH = h;
 			do
