@@ -29,14 +29,40 @@ PT::Trace Sphere::hit(Ray ray) const {
     // ray.dist_bounds! For example, if there are two intersections,
     // but only the _later_ one is within ray.dist_bounds, you should
     // return that one!
+	auto CheckInDis_Bound = [](float t, Vec2 dis_bound)->bool
+	{
+		return t >= dis_bound.x && t <= dis_bound.y;
+	};
+
+	Vec3 O = ray.point;
+	Vec3 D = ray.dir;
+	float a = D.norm() * D.norm();
+	float b = 2 * dot(O, D);
+	float c = O.norm() * O.norm() - radius * radius;
+	float delta = b * b - 4.0f * a * c;
+	float t1 = (-b - sqrt(delta))/ (2.0f * a);
+	float t2 = (-b + sqrt(delta))/ (2.0f * a);
+
+	float t = 0.0f;
+	bool hasIntersectPoint = false;
+	if(CheckInDis_Bound(t1, ray.dist_bounds))
+	{
+		t = t1;
+		hasIntersectPoint = true;
+	}
+	else if(CheckInDis_Bound(t2, ray.dist_bounds))
+	{
+		t = t2;
+		hasIntersectPoint = true;
+	}
 
     PT::Trace ret;
     ret.origin = ray.point;
-    ret.hit = false;       // was there an intersection?
-    ret.distance = 0.0f;   // at what distance did the intersection occur?
-    ret.position = Vec3{}; // where was the intersection?
-    ret.normal = Vec3{};   // what was the surface normal at the intersection?
-	ret.uv = Vec2{}; 	   // what was the uv coordinates at the intersection? (you may find Sphere::uv to be useful)
+    ret.hit = (delta >= 0.0f) && hasIntersectPoint;       // was there an intersection?
+    ret.distance = t;   // at what distance did the intersection occur?
+    ret.position = O + t * D; // where was the intersection?
+    ret.normal = ret.position.unit();   // what was the surface normal at the intersection?
+	ret.uv = uv(ret.position); 	   // what was the uv coordinates at the intersection? (you may find Sphere::uv to be useful)
     return ret;
 }
 

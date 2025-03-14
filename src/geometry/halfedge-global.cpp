@@ -511,7 +511,7 @@ bool Halfedge_Mesh::loop_subdivide() {
 		VertexRef v0 = new_edges[i]->halfedge->vertex;
 		VertexRef v1 = new_edges[i]->halfedge->twin->vertex;
 
-		if(!is_new(v0) && is_new(v1))
+		if((!is_new(v0) && is_new(v1)) || (is_new(v0) && !is_new(v1)))
 			flip_edge(new_edges[i]);
 	}
     

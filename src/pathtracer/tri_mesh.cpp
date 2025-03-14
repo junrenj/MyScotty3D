@@ -22,26 +22,64 @@ BBox Triangle::bbox() const {
 Trace Triangle::hit(const Ray& ray) const {
 	//A3T2
 	
+	auto CheckIsInRange = [](float p, float min, float max)->bool
+	{
+		return p >= min && p <= max;
+	};
+
 	// Each vertex contains a postion and surface normal
     Tri_Mesh_Vert v_0 = vertex_list[v0];
     Tri_Mesh_Vert v_1 = vertex_list[v1];
     Tri_Mesh_Vert v_2 = vertex_list[v2];
-    (void)v_0;
-    (void)v_1;
-    (void)v_2;
 
     // TODO (PathTracer): Task 2
     // Intersect the ray with the triangle defined by the three vertices.
+	Vec3 O = ray.point;
+	Vec3 D = ray.dir;
+	Vec3 E1 = v_1.position - v_0.position;
+	Vec3 E2 = v_2.position - v_0.position;
+	Vec3 N = cross(E2, E1);
+	Vec3 S = O - v_0.position;
+	Vec3 S1 = cross(D, E2);
+	Vec3 S2 = cross(S, E1);
 
+	float S1_E1 = dot(S1, E1);
+	
     Trace ret;
-    ret.origin = ray.point;
-    ret.hit = false;       // was there an intersection?
-    ret.distance = 0.0f;   // at what distance did the intersection occur?
-    ret.position = Vec3{}; // where was the intersection?
-    ret.normal = Vec3{};   // what was the surface normal at the intersection?
-                           // (this should be interpolated between the three vertex normals)
-	ret.uv = Vec2{};	   // What was the uv associated with the point of intersection?
-						   // (this should be interpolated between the three vertex uvs)
+	if(fabs(S1_E1) < 1e-6f)
+		return ret;
+
+	// Cull back 
+	// float NdotD = dot(N, D);
+	// if(NdotD > 0)
+	// 	return ret;
+
+	float inv_S1_E1 = 1.0f / S1_E1;
+	float u = dot(S1, S) * inv_S1_E1;
+	if(!CheckIsInRange(u, 0.0f, 1.0f))
+		return ret;
+	
+	float v = dot(S2, D) * inv_S1_E1;
+	if(!CheckIsInRange(v, 0.0f, 1.0f))
+		return ret;
+
+	float t = dot(S2, E2) * inv_S1_E1;
+	if(!CheckIsInRange(t, ray.dist_bounds.x, ray.dist_bounds.y))
+		return ret;
+
+	float w = 1.0f - u - v;	
+	if(!CheckIsInRange(w, 0.0f, 1.0f))
+		return ret;
+
+	ret.origin = O;
+	ret.hit = true;       // was there an intersection?
+	ret.distance = t;   // at what distance did the intersection occur?
+	ret.position = O + t * D; // where was the intersection?
+	ret.normal = (v_0.normal * w + v_1.normal * u + v_2.normal * v).unit();   // what was the surface normal at the intersection?
+							// (this should be interpolated between the three vertex normals)
+	ret.uv = v_0.uv * w + v_1.uv * u + v_2.uv * v;	   // What was the uv associated with the point of intersection?
+							// (this should be interpolated between the three vertex uvs)
+    
     return ret;
 }
 
