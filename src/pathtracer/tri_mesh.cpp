@@ -16,6 +16,19 @@ BBox Triangle::bbox() const {
     // account for that here, or later on in BBox::hit.
 
     BBox box;
+	Vec3 min = hmin(vertex_list[v0].position, vertex_list[v1].position);
+	min = hmin(min,vertex_list[v2].position);
+	Vec3 max = hmax(vertex_list[v0].position, vertex_list[v1].position);
+	max = hmax(max,vertex_list[v2].position);
+
+	if(min == max)
+	{
+		min -= 1e-6f;
+		max += 1e-6f;
+	}
+
+	box.min = min;
+	box.max = max;
     return box;
 }
 

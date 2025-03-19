@@ -80,13 +80,55 @@ struct BBox {
 
 	bool hit(const Ray& ray, Vec2& times) const {
 		//A3T3 - bbox hit
+		// Get basic data
+		float Ox = ray.point.x;	float Oy = ray.point.y;	float Oz = ray.point.z;
+		float inv_Dx = 1.0f / ray.dir.x;	float inv_Dy = 1.0f / ray.dir.y;	float inv_Dz = 1.0f / ray.dir.z;
+		float B_x0 = min.x;		float B_x1 = max.x;
+		float B_y0 = min.y;		float B_y1 = max.y;
+		float B_z0 = min.z;		float B_z1 = max.x;
+
+		float tmin = 0.0f;
+		float tmax = 0.0f; 
+		if(inv_Dx >= 0)
+		{
+			tmin = (B_x0 - Ox) * inv_Dx;
+			tmax = (B_x1 - Ox) * inv_Dx;
+		}
+		else
+		{
+			tmin = (B_x1 - Ox) * inv_Dx;
+			tmax = (B_x0 - Ox) * inv_Dx;
+		}
+
+		float tymin = (B_y0 - Oy) * inv_Dy;
+		float tymax = (B_y1 - Oy) * inv_Dy;
 
 		// Implement ray - bounding box intersection test
 		// If the ray intersected the bounding box within the range given by
 		// [times.x,times.y], update times with the new intersection times.
 		// This means at least one of tmin and tmax must be within the range
 
-		return false;
+		if((tmin > tymax) || (tymin > tmax))
+			return false;
+		
+		tmin = tmin < tymin ? tymin : tmin;
+		tmax = tmax > tymax ? tymax : tmax;
+		
+		float tzmin = (B_z0 - Oz) * inv_Dz;
+		float tzmax = (B_z1 - Oz) * inv_Dz;
+
+		if((tmin > tzmax) || (tmax < tzmin))
+			return false;
+
+		tmin = tmin < tzmin ? tzmin : tmin;
+		tmax = tmax > tzmax ? tzmax : tmax;
+
+		if((tmin < times.x) || (tmax > times.y))
+			return false;
+		
+		times.x = tmin;
+		times.y = tmax;
+		return true;
 	}
 
 	/// Get the eight corner points of the bounding box

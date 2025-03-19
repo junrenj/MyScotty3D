@@ -1,4 +1,3 @@
-
 #include "bvh.h"
 #include "aggregate.h"
 #include "instance.h"
@@ -24,7 +23,6 @@ struct SAHBucketData {
 template<typename Primitive>
 void BVH<Primitive>::build(std::vector<Primitive>&& prims, size_t max_leaf_size) {
 	//A3T3 - build a bvh
-
 	// Keep these
     nodes.clear();
     primitives = std::move(prims);
@@ -33,7 +31,108 @@ void BVH<Primitive>::build(std::vector<Primitive>&& prims, size_t max_leaf_size)
     // size configuration.
 
 	//TODO
+	if(primitives.empty())
+		return;
 
+	auto build_repeated = [&](auto& self, BVHBuildData data, size_t max_leaf_size)->size_t
+	{
+		size_t index = nodes.size(); 
+		nodes.emplace_back();
+		nodes[index].size = data.range;
+
+		// Step 1: Caculate bbox
+		BBox bb;
+		for (size_t i = data.start; i < data.start + data.range; i++)
+		{
+			bb.enclose(primitives[i].bbox());
+		}
+		nodes[index].bbox = bb;
+		
+		Vec3 range = bb.max - bb.min;
+		int t_axis = 0;
+		if(range.x > range.y && range.x > range.z)
+			t_axis = 0;
+		else if(range.y > range.x && range.y > range.z)
+			t_axis = 1;
+		else 
+			t_axis = 2;
+
+		// Step 2: decide whether it is a leaf 
+		if(data.range <= max_leaf_size)
+		{
+			nodes[index].start = data.start;
+			nodes[index].size = data.range;
+			nodes[index].l = 0;
+			nodes[index].r = 0;
+ 			return index;
+		}
+		
+		// Step 3: SAH algorithm
+		size_t best_split = data.start + 1;
+		float lowest_cost = std::numeric_limits<float>::max();
+		
+		// Devide 3 axis
+		for (int i = 0; i < 3; i++)
+		{
+			// Sort all primitives according to one axis
+			std::sort(primitives.begin() + data.start, primitives.begin() + data.start + data.range, 
+			[i](const Primitive& a, const Primitive& b)-> bool
+			{
+				return a.bbox().center()[i] > b.bbox().center()[i];
+			});
+			
+			// Test all split
+			for (size_t split_index = data.start + 1; split_index < data.start + data.range; split_index++)
+			{
+				BBox left_bb;
+				BBox right_bb;
+				// Left bb
+				for (size_t left = data.start; left < split_index; left++)
+				{
+					left_bb.enclose(primitives[left].bbox());
+				}
+				// Right bb
+				for (size_t right = split_index; right < data.start + data.range; right++)
+				{
+					right_bb.enclose(primitives[right].bbox());
+				}
+
+				// C = C_t + paCa + pbCb
+				// C' = SaNa + SbNb
+				float N_left = (float)(split_index - data.start);
+				float N_right = (float)data.range - N_left;
+				float S_left = left_bb.surface_area();
+				float S_right = right_bb.surface_area();
+
+				// Caculate lowest cost
+				float cost = S_left * N_left + S_right * N_right;
+				if(cost < lowest_cost)
+				{
+					lowest_cost = cost;
+					best_split = split_index;
+				}
+			}
+		}
+		
+		// Sort by best axis
+		std::sort(primitives.begin() + data.start, primitives.begin() + data.start + data.range, 
+		[t_axis](const Primitive& a, const Primitive& b)-> bool
+		{
+			return a.bbox().center()[t_axis] > b.bbox().center()[t_axis];
+		});
+
+		BVHBuildData left_data = BVHBuildData(data.start, best_split - data.start, nodes.size());
+		size_t left_child = self(self, left_data, max_leaf_size);
+		BVHBuildData right_data = BVHBuildData(best_split, data.start + data.range - best_split, nodes.size());
+		size_t right_child = self(self, right_data, max_leaf_size);
+
+		nodes[index].l = left_child;
+		nodes[index].r = right_child;
+
+		return index;
+	};
+	BVHBuildData newData = BVHBuildData(0, primitives.size(), 0);
+	build_repeated(build_repeated, newData, max_leaf_size);
 }
 
 template<typename Primitive> Trace BVH<Primitive>::hit(const Ray& ray) const {
@@ -47,12 +146,64 @@ template<typename Primitive> Trace BVH<Primitive>::hit(const Ray& ray) const {
     // Again, remember you can use hit() on any Primitive value.
 
 	//TODO: replace this code with a more efficient traversal:
-    Trace ret;
-    for(const Primitive& prim : primitives) {
-        Trace hit = prim.hit(ray);
-        ret = Trace::min(ret, hit);
-    }
-    return ret;
+	Trace t;
+	Vec2 times = Vec2(ray.dist_bounds.x, ray.dist_bounds.y);
+	if(nodes.empty())
+		return t;
+	
+	auto FindClosestHit = [&](auto& self, const Node& node, const Ray& ray)-> Trace
+	{
+		Trace ret;
+		if(node.bbox.hit(ray, times))
+		{
+			if(node.is_leaf())
+			{
+				for (size_t i = node.start; i < node.start + node.size; i++)
+				{
+					ret = primitives[i].hit(ray);
+					if(ret.hit)
+						return ret;
+				}
+				return ret;
+			}
+			else
+			{
+				size_t first = node.l;
+				size_t second = node.r;
+				bool leftHit;
+				bool rightHit;
+				leftHit = nodes[first].bbox.hit(ray, times);
+				rightHit = nodes[second].bbox.hit(ray, times);
+
+				if(leftHit && rightHit)		// right is closer
+				{
+					ret = self(self, nodes[second], ray);
+					if(nodes[first].bbox.hit(ray, times))
+					{
+						ret = self(self, nodes[first], ray);
+					}
+				}
+				else if(!leftHit && !rightHit)// No intersect
+					return ret;
+				else if(!leftHit && rightHit)	// only right intersect
+					ret = self(self, nodes[second], ray);
+				else	// left is closer
+				{
+					ret = self(self, nodes[first], ray);
+					if(nodes[second].bbox.hit(ray, times))
+					{
+						ret = self(self, nodes[second], ray);
+					}
+				}	
+				return ret;
+			}
+		}
+		else
+			return ret;
+	};
+
+    t = FindClosestHit(FindClosestHit, nodes[0], ray);
+	return t;
 }
 
 template<typename Primitive>
