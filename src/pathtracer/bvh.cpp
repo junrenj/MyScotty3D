@@ -27,10 +27,6 @@ void BVH<Primitive>::build(std::vector<Primitive>&& prims, size_t max_leaf_size)
     nodes.clear();
     primitives = std::move(prims);
 
-    // Construct a BVH from the given vector of primitives and maximum leaf
-    // size configuration.
-
-	// //TODO
 	if(primitives.empty())
 		return;
 
@@ -52,16 +48,16 @@ void BVH<Primitive>::build(std::vector<Primitive>&& prims, size_t max_leaf_size)
 		int axis_best = 0;
 		float partition_best = 0.0f;
 		float cost_lowest = FLT_MAX;
+		size_t bucket_num = 16;
 		
-		size_t bucket_num = data.range < 16 ? data.range : 16;
-
+		// Step 2: Search three axis
 		for (int axis = 0; axis < 3; axis++)
 		{
 			float bucket_w = (bb.max - bb.min)[axis] / float(bucket_num);
 			std::vector<SAHBucketData> buckets(bucket_num);
 			if (bucket_w < 1e-6f) 
 				bucket_w = 1e-6f; 
-
+			// Step 3: Assign primitives to buckets
 			for (size_t p_idx = data.start; p_idx < data.start + data.range; p_idx++)
 			{
 				float center = primitives[p_idx].bbox().center()[axis];
@@ -74,17 +70,21 @@ void BVH<Primitive>::build(std::vector<Primitive>&& prims, size_t max_leaf_size)
 				buckets[bucket_idx].num_prims++;
 			}
 
+			// Step 4 : Find best split bucket
 			for (size_t bucketSplit_idx = 1; bucketSplit_idx < bucket_num; bucketSplit_idx++)
 			{
 				BBox left_bb;
 				BBox right_bb;
 				size_t N_left = 0;
 				size_t N_right = 0;
+
+				// Step 4.1 Calculate left box
 				for (size_t l = 0; l < bucketSplit_idx; l++)
 				{
 					left_bb.enclose(buckets[l].bb);
 					N_left += buckets[l].num_prims;
 				}
+				// Step 4.2 Caculate right box
 				for (size_t r = bucketSplit_idx; r < bucket_num; r++)
 				{
 					right_bb.enclose(buckets[r].bb);
@@ -105,20 +105,25 @@ void BVH<Primitive>::build(std::vector<Primitive>&& prims, size_t max_leaf_size)
 			}
 		}
 
+		// Step 4 : kind of resort
 		std::partition(primitives.begin() + data.start, primitives.begin() + data.start + data.range, 
 		[axis_best, partition_best](Primitive& p)
 		{
 			return p.bbox().center()[axis_best] <= partition_best;
 		});
 		
+		// Step 5 : create new nodes default is leaf
 		nodes[index].l = new_node(left_bb_best, data.start, leftSize_best, 0, 0);
 		nodes[index].r = new_node(right_bb_best, data.start + leftSize_best, rightSize_best, 0, 0);
 
+		// Step 6 : repeat
 		BVHBuildData left_data = BVHBuildData(data.start, leftSize_best, nodes[index].l);
 		build_repeated(left_data, max_leaf_size);
 		BVHBuildData right_data = BVHBuildData(data.start + leftSize_best, rightSize_best, nodes[index].r);
 		build_repeated(right_data, max_leaf_size);
 	};
+
+	// Main Function
 	BBox bb_root;
 	for (size_t i = 0; i < primitives.size(); i++)
 	{
@@ -133,15 +138,6 @@ void BVH<Primitive>::build(std::vector<Primitive>&& prims, size_t max_leaf_size)
 
 template<typename Primitive> Trace BVH<Primitive>::hit(const Ray& ray) const {
 	//A3T3 - traverse your BVH
-
-    // Implement ray - BVH intersection test. A ray intersects
-    // with a BVH aggregate if and only if it intersects a primitive in
-    // the BVH that is not an aggregate.
-
-    // The starter code simply iterates through all the primitives.
-    // Again, remember you can use hit() on any Primitive value.
-
-	//TODO: replace this code with a more efficient traversal:
 	Trace t;
 	Vec2 times = ray.dist_bounds;
 	if(nodes.empty())
@@ -174,9 +170,10 @@ template<typename Primitive> Trace BVH<Primitive>::hit(const Ray& ray) const {
 				leftHit = nodes[first].bbox.hit(ray, localTimes_L);
 				rightHit = nodes[second].bbox.hit(ray, localTimes_R);
 
+				// Case 1: Both are intersected
 				if(leftHit && rightHit)
 				{
-					// test the cloest one first
+					// Test the closest one first
 					if(localTimes_L.x > localTimes_R.x)
 					{
 						std::swap(first, second);
@@ -191,9 +188,9 @@ template<typename Primitive> Trace BVH<Primitive>::hit(const Ray& ray) const {
                     if (rightTrace.hit && rightTrace.distance <= ret.distance)
                         ret = rightTrace;
 				}
-				else if(leftHit)
+				else if(leftHit)	// case 2 : only left
 					ret = self(self, nodes[first], ray, localTimes_L);
-				else if(rightHit)
+				else if(rightHit)	// case 3 : only right
 					ret = self(self, nodes[second], ray, localTimes_R);	
 				return ret;
 			}
@@ -202,6 +199,7 @@ template<typename Primitive> Trace BVH<Primitive>::hit(const Ray& ray) const {
 			return ret;
 	};
 
+	// Main Function
     t = FindClosestHit(FindClosestHit, nodes[0], ray, times);
 	return t;
 }
