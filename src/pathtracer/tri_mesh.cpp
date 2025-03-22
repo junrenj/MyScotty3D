@@ -21,12 +21,15 @@ BBox Triangle::bbox() const {
 	Vec3 max = hmax(vertex_list[v0].position, vertex_list[v1].position);
 	max = hmax(max,vertex_list[v2].position);
 
-	if(min == max)
+	for (int i = 0; i < 3; i++)
 	{
-		min -= 1e-6f;
-		max += 1e-6f;
+		if(max[i] - min[i] < FLT_MIN)
+		{
+			max[i] += 1e-6f;
+			min[i] -= 1e-6f;
+		}
 	}
-
+	
 	box.min = min;
 	box.max = max;
     return box;

@@ -2,7 +2,6 @@
 #include "aggregate.h"
 #include "instance.h"
 #include "tri_mesh.h"
-#include <iostream>
 
 #include <stack>
 
