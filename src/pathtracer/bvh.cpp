@@ -31,127 +31,105 @@ void BVH<Primitive>::build(std::vector<Primitive>&& prims, size_t max_leaf_size)
     // Construct a BVH from the given vector of primitives and maximum leaf
     // size configuration.
 
-	//TODO
+	// //TODO
 	if(primitives.empty())
 		return;
 
-	auto build_repeated = [&](auto& self, BVHBuildData data, size_t max_leaf_size)->size_t
+	std::function<void(BVHBuildData, size_t)> build_repeated;
+	build_repeated = [&](BVHBuildData data, size_t max_leaf_size)
 	{
-		size_t bucket_num = data.range < 16 ? data.range : 16;
-		std::vector<SAHBucketData> buckets(bucket_num);
-		size_t index = nodes.size(); 
-		nodes.emplace_back();
-		nodes[index].size = data.range;
-		nodes[index].start = data.start;
+		if(data.range <= max_leaf_size)
+			return;
+		
+		size_t index = data.node;
 
 		// Step 1: Caculate bbox
-		BBox bb;
-		for (size_t i = data.start; i < data.start + data.range; i++)
-		{
-			bb.enclose(primitives[i].bbox());
-		}
-		nodes[index].bbox = bb;
+		BBox bb = nodes[index].bbox;
+
+		size_t leftSize_best = 0;
+		size_t rightSize_best = 0;
+		BBox left_bb_best;
+		BBox right_bb_best;
+		int axis_best = 0;
+		float partition_best = 0.0f;
+		float cost_lowest = FLT_MAX;
 		
-		Vec3 range = bb.max - bb.min;
-		int t_axis = 0;
-		if(range.x > range.y && range.x > range.z)
-			t_axis = 0;
-		else if(range.y > range.x && range.y > range.z)
-			t_axis = 1;
-		else 
-			t_axis = 2;
+		size_t bucket_num = data.range < 16 ? data.range : 16;
 
-		// Step 2: decide whether it is a leaf 
-		if(data.range <= max_leaf_size)
+		for (int axis = 0; axis < 3; axis++)
 		{
-			nodes[index].l = 0;
-			nodes[index].r = 0;
- 			return index;
-		}
+			float bucket_w = (bb.max - bb.min)[axis] / float(bucket_num);
+			std::vector<SAHBucketData> buckets(bucket_num);
+			if (bucket_w < 1e-6f) 
+				bucket_w = 1e-6f; 
 
-		// Step 3.0 init bucket
-		for (size_t i = 0; i < bucket_num; i++)
-		{
-			buckets[i].bb = BBox();
-			buckets[i].num_prims = 0;
-		}
-
-		float axis_min = bb.min[t_axis];
-		float axis_max = bb.max[t_axis];
-		float bucket_width = (axis_max - axis_min) / (float)bucket_num;
-		size_t data_End = data.start + data.range;
-
-		// Step 3 :: assign primitive to target bucket
-		for (size_t i = data.start; i < data_End; i++)
-		{
-			int bucket_idx = std::min((int)bucket_num - 1, (int)((primitives[i].bbox().center()[t_axis] - axis_min) / bucket_width));;
-			buckets[bucket_idx].bb.enclose(primitives[i].bbox());
-			buckets[bucket_idx].num_prims++;
-		}
-		
-		// Step 4: SAH algorithm
-		float lowest_cost = std::numeric_limits<float>::max();
-		size_t bestSplit_Bucket = 0;
-		BBox left_bb;
-		size_t N_left = 0;
-		size_t N_right = data.range;
-
-		for (size_t idx = 1; idx < bucket_num - 1; idx++)
-		{
-			if(buckets[idx].num_prims == 0) 
-				continue;
-			BBox right_bb;
-			left_bb.enclose(buckets[idx].bb);
-			for (size_t i = idx + 1; i < bucket_num - 1; i++)
+			for (size_t p_idx = data.start; p_idx < data.start + data.range; p_idx++)
 			{
-				right_bb.enclose(buckets[i].bb);
-			}
+				float center = primitives[p_idx].bbox().center()[axis];
+				size_t bucket_idx = static_cast<size_t>((center - bb.min[axis]) / bucket_w);
+				
+				if (bucket_idx >= bucket_num) 
+					bucket_idx = bucket_num - 1;
 			
-			N_left += buckets[idx].num_prims;
-			N_right -= buckets[idx].num_prims;
+				buckets[bucket_idx].bb.enclose(primitives[p_idx].bbox());
+				buckets[bucket_idx].num_prims++;
+			}
 
-			if(N_left == 0 || N_right == 0)
-				continue;
-
-			// Caculate lowest cost
-			float S_left = left_bb.surface_area();
-			float S_right = right_bb.surface_area();
-			float cost = S_left * (float)N_left + S_right * (float)N_right;
-
-			if(cost < lowest_cost)
+			for (size_t bucketSplit_idx = 1; bucketSplit_idx < bucket_num; bucketSplit_idx++)
 			{
-				lowest_cost = cost;
-				bestSplit_Bucket = idx;
+				BBox left_bb;
+				BBox right_bb;
+				size_t N_left = 0;
+				size_t N_right = 0;
+				for (size_t l = 0; l < bucketSplit_idx; l++)
+				{
+					left_bb.enclose(buckets[l].bb);
+					N_left += buckets[l].num_prims;
+				}
+				for (size_t r = bucketSplit_idx; r < bucket_num; r++)
+				{
+					right_bb.enclose(buckets[r].bb);
+					N_right += buckets[r].num_prims;
+				}
+				float cost = left_bb.surface_area() * (float)N_left + right_bb.surface_area() * (float)N_right;
+				
+				if(cost < cost_lowest)
+				{
+					cost_lowest = cost;
+					leftSize_best = N_left;
+					rightSize_best = N_right;
+					left_bb_best = left_bb;
+					right_bb_best = right_bb;
+					partition_best = bb.min[axis] + bucket_w * bucketSplit_idx;
+					axis_best = axis;
+				}
 			}
 		}
 
-		auto middle = std::partition(primitives.begin() + data.start, primitives.begin() + data_End, 
-		[&](const Primitive& p)
+		std::partition(primitives.begin() + data.start, primitives.begin() + data.start + data.range, 
+		[axis_best, partition_best](Primitive& p)
 		{
-			int bucket_idx = std::min((int)bucket_num - 1, (int)(std::floor((p.bbox().center()[t_axis] - axis_min) / bucket_width)));
-			return bucket_idx < bestSplit_Bucket;
+			return p.bbox().center()[axis_best] <= partition_best;
 		});
-
-
-		size_t bestSplit_idx = (size_t)std::max((int)std::distance(primitives.begin(), middle), (int)data.start + 1);
 		
-		BVHBuildData left_data = BVHBuildData(data.start, bestSplit_idx - data.start, nodes.size());
-		size_t left_child = 0;
-		if(left_data.range >= 1)
-			left_child = self(self, left_data, max_leaf_size);
-			
-		BVHBuildData right_data = BVHBuildData(bestSplit_idx, data_End - bestSplit_idx, nodes.size());
-		size_t right_child = 0;
-		if(right_data.range >= 1)
-			right_child = self(self, right_data, max_leaf_size);
+		nodes[index].l = new_node(left_bb_best, data.start, leftSize_best, 0, 0);
+		nodes[index].r = new_node(right_bb_best, data.start + leftSize_best, rightSize_best, 0, 0);
 
-		nodes[index].l = left_child;
-		nodes[index].r = right_child;
-		return index;
+		BVHBuildData left_data = BVHBuildData(data.start, leftSize_best, nodes[index].l);
+		build_repeated(left_data, max_leaf_size);
+		BVHBuildData right_data = BVHBuildData(data.start + leftSize_best, rightSize_best, nodes[index].r);
+		build_repeated(right_data, max_leaf_size);
 	};
-
+	BBox bb_root;
+	for (size_t i = 0; i < primitives.size(); i++)
+	{
+		bb_root.enclose(primitives[i].bbox());
+	}
+	
+	new_node(bb_root,0,primitives.size(),0,0);
 	BVHBuildData newData = BVHBuildData(0, primitives.size(), 0);
-	build_repeated(build_repeated, newData, max_leaf_size);
+	build_repeated(newData, max_leaf_size);
+	
 }
 
 template<typename Primitive> Trace BVH<Primitive>::hit(const Ray& ray) const {
@@ -166,28 +144,23 @@ template<typename Primitive> Trace BVH<Primitive>::hit(const Ray& ray) const {
 
 	//TODO: replace this code with a more efficient traversal:
 	Trace t;
-	Vec2 times = Vec2(ray.dist_bounds.x, ray.dist_bounds.y);
+	Vec2 times = ray.dist_bounds;
 	if(nodes.empty())
 		return t;
 	
-	auto FindClosestHit = [&](auto& self, const Node& node, const Ray& ray)-> Trace
+	auto FindClosestHit = [&](auto& self, const Node& node, const Ray& ray, Vec2 newTime)-> Trace
 	{
 		Trace ret;
-		ret.distance = std::numeric_limits<float>::max();
-		Vec2 localTimes_L = times;
-		Vec2 localTimes_R = times;
-		if(node.bbox.hit(ray, times))
+		ret.distance = FLT_MAX;
+		if(node.bbox.hit(ray, newTime))
 		{
 			if(node.is_leaf())
 			{
 				for (size_t i = node.start; i < node.start + node.size; i++)
 				{
 					Trace newRet = primitives[i].hit(ray);
-					std::cout <<"isLeaf" <<std::endl;
-					if(newRet.hit)
-					{
-						ret = Trace::min(newRet, ret);
-					}
+					if(newRet.hit && newRet.distance < ret.distance)
+						ret = newRet;
 				}
 				return ret;
 			}
@@ -197,24 +170,32 @@ template<typename Primitive> Trace BVH<Primitive>::hit(const Ray& ray) const {
 				size_t second = node.r;
 				bool leftHit;
 				bool rightHit;
+				Vec2 localTimes_L = newTime;
+				Vec2 localTimes_R = newTime;
 				leftHit = nodes[first].bbox.hit(ray, localTimes_L);
 				rightHit = nodes[second].bbox.hit(ray, localTimes_R);
 
 				if(leftHit && rightHit)
 				{
+					// test the cloest one first
 					if(localTimes_L.x > localTimes_R.x)
+					{
 						std::swap(first, second);
+						std::swap(localTimes_L, localTimes_R);
+					}
 					
-						ret = self(self, nodes[first], ray);
-						if(!ret.hit)
-						{
-							ret = self(self, nodes[second], ray);
-						}
+					Trace leftTrace = self(self, nodes[first], ray, localTimes_L);
+					if(leftTrace.hit)
+						ret = leftTrace;
+
+					Trace rightTrace = self(self, nodes[second], ray, localTimes_R);
+                    if (rightTrace.hit && rightTrace.distance <= ret.distance)
+                        ret = rightTrace;
 				}
 				else if(leftHit)
-					ret = self(self, nodes[first], ray);
+					ret = self(self, nodes[first], ray, localTimes_L);
 				else if(rightHit)
-					ret = self(self, nodes[second], ray);	
+					ret = self(self, nodes[second], ray, localTimes_R);	
 				return ret;
 			}
 		}
@@ -222,7 +203,7 @@ template<typename Primitive> Trace BVH<Primitive>::hit(const Ray& ray) const {
 			return ret;
 	};
 
-    t = FindClosestHit(FindClosestHit, nodes[0], ray);
+    t = FindClosestHit(FindClosestHit, nodes[0], ray, times);
 	return t;
 }
 

@@ -81,32 +81,22 @@ struct BBox {
 	bool hit(const Ray& ray, Vec2& times) const {
 		//A3T3 - bbox hit
 		// Get basic data
-		float Ox = ray.point.x;	float Oy = ray.point.y;	float Oz = ray.point.z;
+		float px = ray.point.x;	float py = ray.point.y;	float pz = ray.point.z;
 		float inv_Dx = 1.0f / ray.dir.x;	float inv_Dy = 1.0f / ray.dir.y;	float inv_Dz = 1.0f / ray.dir.z;
-		float B_x0 = min.x;		float B_x1 = max.x;
-		float B_y0 = min.y;		float B_y1 = max.y;
-		float B_z0 = min.z;		float B_z1 = max.x;
+		float min_x = min.x;		float max_x = max.x;
+		float min_y = min.y;		float max_y = max.y;
+		float min_z = min.z;		float max_z = max.z;
 
-		float tmin = 0.0f;
-		float tmax = 0.0f; 
-		if(inv_Dx >= 0)
-		{
-			tmin = (B_x0 - Ox) * inv_Dx;
-			tmax = (B_x1 - Ox) * inv_Dx;
-		}
-		else
-		{
-			tmin = (B_x1 - Ox) * inv_Dx;
-			tmax = (B_x0 - Ox) * inv_Dx;
-		}
+		float tmin = (min_x - px) * inv_Dx;
+		float tmax = (max_x - px) * inv_Dx; 
+		if(inv_Dx < 0)
+			std::swap(tmin, tmax);
 
-		float tymin = (B_y0 - Oy) * inv_Dy;
-		float tymax = (B_y1 - Oy) * inv_Dy;
+		float tymin = (min_y - py) * inv_Dy;
+		float tymax = (max_y - py) * inv_Dy;
 
-		// Implement ray - bounding box intersection test
-		// If the ray intersected the bounding box within the range given by
-		// [times.x,times.y], update times with the new intersection times.
-		// This means at least one of tmin and tmax must be within the range
+		if(inv_Dy < 0)
+			std::swap(tymin, tymax);
 
 		if((tmin > tymax) || (tymin > tmax))
 			return false;
@@ -114,20 +104,28 @@ struct BBox {
 		tmin = tmin < tymin ? tymin : tmin;
 		tmax = tmax > tymax ? tymax : tmax;
 		
-		float tzmin = (B_z0 - Oz) * inv_Dz;
-		float tzmax = (B_z1 - Oz) * inv_Dz;
+		float tzmin = (min_z - pz) * inv_Dz;
+		float tzmax = (max_z - pz) * inv_Dz;
+		if (inv_Dz < 0) 
+			std::swap(tzmin, tzmax);
 
-		if((tmin > tzmax) || (tmax < tzmin))
+		if((tmin > tzmax) || (tzmin > tmax))
 			return false;
 
 		tmin = tmin < tzmin ? tzmin : tmin;
 		tmax = tmax > tzmax ? tzmax : tmax;
 
-		if((tmin < times.x) || (tmax > times.y))
-			return false;
+		// Implement ray - bounding box intersection test
+		// If the ray intersected the bounding box within the range given by
+		// [times.x,times.y], update times with the new intersection times.
+		// This means at least one of tmin and tmax must be within the range
 		
-		times.x = tmin;
-		times.y = tmax;
+		if ((tmax < times.x) || (tmin > times.y)) 
+			return false;
+
+    	times.x = std::max(times.x, tmin);
+    	times.y = std::min(times.y, tmax);
+
 		return true;
 	}
 
