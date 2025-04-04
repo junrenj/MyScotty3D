@@ -76,9 +76,6 @@ Spectrum Pathtracer::sample_direct_lighting_task6(RNG &rng, const Shading_Info& 
 		pdf = hit.bsdf.pdf(hit.out_dir, dir_WS);
 	}
 
-	if(pdf <= 1e-6)
-		return radiance;
-
 	Ray shadow_Ray = Ray(hit.pos, dir_WS, Vec2(EPS_F, FLT_MAX), 0);
 	Spectrum incomingLight = trace(rng, shadow_Ray).first;
 	Vec3 dir_OS = hit.world_to_object.rotate(dir_WS);
@@ -87,8 +84,8 @@ Spectrum Pathtracer::sample_direct_lighting_task6(RNG &rng, const Shading_Info& 
 	float pdf_Light = area_lights_pdf(hit.pos, dir_WS);
 	float pdf_Bsdf = hit.bsdf.pdf(hit.out_dir, dir_OS);
 
-	float weight = isUseLighting ? (pdf_Light/(pdf_Light + pdf_Bsdf)) : (pdf_Bsdf/(pdf_Light + pdf_Bsdf));
-	Spectrum mixLight = incomingLight * emittedLight * weight / pdf;
+	float weight = (pdf_Light + pdf_Bsdf) * 0.5f;
+	Spectrum mixLight = incomingLight * emittedLight  / weight;
 
 	// Example of using log_ray():
 	if constexpr (LOG_AREA_LIGHT_RAYS) {
