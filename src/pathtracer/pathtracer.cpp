@@ -59,21 +59,18 @@ Spectrum Pathtracer::sample_direct_lighting_task6(RNG &rng, const Shading_Info& 
 
     Spectrum radiance = sum_delta_lights(hit);
 	
-	float pdf;
 	Vec3 dir_WS;
 	bool isUseLighting = rng.coin_flip(0.5f);
 	if(isUseLighting)
 	{
 		// 1.Area Light
 		dir_WS = sample_area_lights(rng, hit.pos);
-		pdf = area_lights_pdf(hit.pos, dir_WS);
 	}
 	else
 	{
 		// 2.BSDF
 		Materials::Scatter scatter = hit.bsdf.scatter(rng, hit.out_dir, hit.uv);
 		dir_WS = hit.object_to_world.rotate(scatter.direction);
-		pdf = hit.bsdf.pdf(hit.out_dir, dir_WS);
 	}
 
 	Ray shadow_Ray = Ray(hit.pos, dir_WS, Vec2(EPS_F, FLT_MAX), 0);
