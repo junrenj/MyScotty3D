@@ -138,7 +138,7 @@ Sphere::Image::Image(const HDR_Image& image) {
 		{
 			Spectrum color = image.at(x, y);
 			float brightness = color.luma();
-			float weight = brightness * sinf(PI_F * (y + 0.5f) / h); 
+			float weight = brightness * sinf(PI_F *(1.0f - (y + 0.5f)) / h); 
 
 			_pdf[y* w + x] = weight;
 			totalWeight += weight;
@@ -181,9 +181,9 @@ Vec3 Sphere::Image::sample(RNG &rng) const {
 		float phi = 2 * PI_F * u;
 		float the_ta = PI_F * v;
 
-		float xc = sinf(phi) * cosf(the_ta);
+		float xc = sinf(the_ta) * cosf(phi);
 		float yc = cosf(the_ta);
-		float zc = sinf(phi) * sinf(the_ta);
+		float zc = sinf(the_ta) * sinf(phi);
     	return Vec3(xc, yc, zc).unit();
 	}
 }
@@ -214,6 +214,9 @@ float Sphere::Image::pdf(Vec3 dir) const {
 
 		size_t index = y * w + x;
 
+		float sin_theta = sinf(theta);
+		if(sin_theta <= 0.0f)
+			sin_theta = 1e-6f;
 		pdf =  _pdf[index] * w * h / (2 * PI_F * PI_F * sinf(theta));
 	}
 	return pdf;

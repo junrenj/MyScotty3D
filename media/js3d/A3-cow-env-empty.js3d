@@ -46,7 +46,7 @@
 		"Texture":{
 			"type":"Image",
 			"sampler":"nearest",
-			"image":"hdr64:cmF3ZgAAAAAAAAAA"
+			"image":"../../../A3.5/asst3_exr_archive/grace.exr"
 		},
 		"white":{
 			"type":"Constant",
