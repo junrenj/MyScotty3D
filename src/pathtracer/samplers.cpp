@@ -152,7 +152,6 @@ Sphere::Image::Image(const HDR_Image& image) {
 		_cdf[i] = _pdf[i] + accum;
 		accum = _cdf[i];
 	}
-	_cdf.back() = 1.0f;
 }
 
 Vec3 Sphere::Image::sample(RNG &rng) const {
