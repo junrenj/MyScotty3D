@@ -1,5 +1,5 @@
 #include "particles.h"
-
+#include <iostream>
 
 bool Particles::Particle::update(const PT::Aggregate &scene, Vec3 const &gravity, const float radius, const float dt) {
 
@@ -25,31 +25,22 @@ bool Particles::Particle::update(const PT::Aggregate &scene, Vec3 const &gravity
 		}
 		else
 		{
+			Vec3 normal = trace.normal.unit();
+			float cos_theta = fabs(dot(dir.unit(), -normal));
+			float traveDistance = trace.distance - radius / cos_theta;
+			float timeConsume = traveDistance / speed;
 			// case 2 : didn't hit
-			if(trace.distance > speed * time)
+			if(timeConsume >= time)
 			{
 				position += velocity * time;
 				velocity += gravity * time;
 				break;
 			}
-			Vec3 normal = trace.normal.unit();
-			float cos_theta = fabs(dot(dir.unit(), -normal));
-			float traveDistance = trace.distance - radius / cos_theta;
-			// case 2 : particle is inside the surface
-			if(traveDistance <= 0.0f)
-			{
-				velocity = velocity - 2 * normal * dot(normal, velocity);
-				continue;
-			}
 			else
 			{
 				// case 3 : successfully hit
-				float timeConsume = traveDistance / speed;
-				timeConsume = timeConsume > time ? time : timeConsume;
 				position += velocity * timeConsume;
-				velocity += gravity * timeConsume;
-	
-				velocity = velocity - 2 * normal * dot(normal, velocity);
+				velocity = velocity - 2 * normal * dot(normal, velocity) + gravity * timeConsume;
 	
 				time -= timeConsume;
 			}
