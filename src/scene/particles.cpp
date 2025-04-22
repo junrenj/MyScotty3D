@@ -1,5 +1,4 @@
 #include "particles.h"
-#include <iostream>
 
 bool Particles::Particle::update(const PT::Aggregate &scene, Vec3 const &gravity, const float radius, const float dt) {
 
