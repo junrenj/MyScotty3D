@@ -1,24 +1,63 @@
-
 #include "particles.h"
+
 
 bool Particles::Particle::update(const PT::Aggregate &scene, Vec3 const &gravity, const float radius, const float dt) {
 
 	//A4T4: particle update
-
+	float time = dt;
 	// Compute the trajectory of this particle for the next dt seconds.
-
-	// (1) Build a ray representing the particle's path as if it travelled at constant velocity.
-
-	// (2) Intersect the ray with the scene and account for collisions. Be careful when placing
-	// collision points using the particle radius. Move the particle to its next position.
-
-	// (3) Account for acceleration due to gravity after updating position.
-
-	// (4) Repeat until the entire time step has been consumed.
-
+	while (time > 0.0f)
+	{
+		float speed = velocity.norm();
+		Vec3 dir = velocity / speed;
+		
+		// (1) Build a ray representing the particle's path as if it travelled at constant velocity.
+		Ray ray = Ray(position, dir, Vec2(0.0f, std::numeric_limits<float>::infinity()), 0);
+		// (2) Intersect the ray with the scene and account for collisions. Be careful when placing
+		// collision points using the particle radius. Move the particle to its next position.
+		PT::Trace trace = scene.hit(ray);
+		// case 1 : didn't hit
+		if(!trace.hit)
+		{
+			position += velocity * time;
+			velocity += gravity * time;
+			break;
+		}
+		else
+		{
+			// case 2 : didn't hit
+			if(trace.distance > speed * time)
+			{
+				position += velocity * time;
+				velocity += gravity * time;
+				break;
+			}
+			Vec3 normal = trace.normal.unit();
+			float cos_theta = fabs(dot(dir.unit(), -normal));
+			float traveDistance = trace.distance - radius / cos_theta;
+			// case 2 : particle is inside the surface
+			if(traveDistance <= 0.0f)
+			{
+				velocity = velocity - 2 * normal * dot(normal, velocity);
+				continue;
+			}
+			else
+			{
+				// case 3 : successfully hit
+				float timeConsume = traveDistance / speed;
+				timeConsume = timeConsume > time ? time : timeConsume;
+				position += velocity * timeConsume;
+				velocity += gravity * timeConsume;
+	
+				velocity = velocity - 2 * normal * dot(normal, velocity);
+	
+				time -= timeConsume;
+			}
+		}
+	}
 	// (5) Decrease the particle's age and return 'false' if it should be removed.
-
-	return false;
+	age -= dt;
+	return age > 0.0f;
 }
 
 void Particles::advance(const PT::Aggregate& scene, const Mat4& to_world, float dt) {
